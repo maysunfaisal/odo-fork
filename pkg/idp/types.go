@@ -21,7 +21,7 @@ type Spec struct {
 	Runtime   SpecRuntime    `yaml:"runtime"`
 	Shared    SpecShared     `yaml:"shared"`
 	Tasks     []SpecTask     `yaml:"tasks"`
-	Scenarios []SpecScenario `yaml:"scenario"`
+	Scenarios []SpecScenario `yaml:"scenarios"`
 }
 
 // SpecDev represents the fields under `spec.dev` in the idp.yaml
