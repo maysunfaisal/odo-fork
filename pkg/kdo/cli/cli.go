@@ -104,7 +104,6 @@ func NewCmdUdo(name, fullName string) *cobra.Command {
 		common.CmdPrintUdo,
 		component.NewCmdCreate(component.CreateRecommendedCommandName, kdoutil.GetFullName(fullName, component.CreateRecommendedCommandName)),
 		component.NewCmdPush(component.PushRecommendedCommandName, kdoutil.GetFullName(fullName, component.PushRecommendedCommandName)),
-		component.NewCmdBuild(component.BuildRecommendedCommandName, kdoutil.GetFullName(fullName, component.BuildRecommendedCommandName)),
 		version.NewCmdVersion(version.RecommendedCommandName, kdoutil.GetFullName(fullName, version.RecommendedCommandName)),
 		config.NewCmdConfiguration(config.RecommendedCommandName, kdoutil.GetFullName(fullName, config.RecommendedCommandName)),
 		url.NewCmdURL(url.RecommendedCommandName, kdoutil.GetFullName(fullName, url.RecommendedCommandName)),
