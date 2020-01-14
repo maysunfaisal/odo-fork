@@ -212,8 +212,9 @@ func createComponentFromIDP(devPack *idp.IDP, namespace, serviceAccount string, 
 		return nil, errors.New("No containers defined")
 	}
 
+	containerVolumesMap := make(map[string][]string)
 	// Create a pod that includes all of the containers
-	po, err := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers, []string{}, []string{}, []string{})
+	po, err := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers, []string{}, []string{}, []string{}, containerVolumesMap, containerVolumesMap)
 
 	return po, err
 

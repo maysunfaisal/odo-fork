@@ -613,7 +613,8 @@ func GenerateContainerSpec(name, image string, isPrivileged bool) corev1.Contain
 	return *container
 }
 
-func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[string]string, containers []corev1.Container, pvcNames, mountPath, subPath []string) (*corev1.Pod, error) {
+// GeneratePodSpec generates the pod spec
+func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[string]string, containers []corev1.Container, pvcNames, mountPath, subPath []string, containerVolumesMap, volumesPVCMap map[string][]string) (*corev1.Pod, error) {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -631,7 +632,20 @@ func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[s
 	}
 
 	for i, pvcName := range pvcNames {
-		err := AddPVCToPod(pod, pvcName, mountPath[i], subPath[i])
+		var volName, containerName string
+		for k, v := range volumesPVCMap {
+			if v[0] == pvcName {
+				volName = k
+				break
+			}
+		}
+		for k, v := range containerVolumesMap {
+			if v[0] == volName {
+				containerName = k
+				break
+			}
+		}
+		err := AddPVCToPod(pod, pvcName, mountPath[i], "", containerName)
 		if err != nil {
 			return nil, errors.New("Unable to add volumes to the pod: " + err.Error())
 		}
