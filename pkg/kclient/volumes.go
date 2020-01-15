@@ -75,8 +75,7 @@ func (c *Client) AddPVCToDeployment(dep *appsv1.Deployment, pvc string, path, su
 // AddPVCToPod adds the given PVC to the given pod
 // at the given path
 // TODO: (rajivnathan) - volumes should be added to containers
-func AddPVCToPod(pod *corev1.Pod, pvc, path, subPath, containerName string) error {
-	volumeName := generateVolumeNameFromPVC(pvc)
+func AddPVCToPod(pod *corev1.Pod, pvc, volumeName string) {
 
 	// fmt.Println("volumeName:", volumeName)
 
@@ -89,20 +88,31 @@ func AddPVCToPod(pod *corev1.Pod, pvc, path, subPath, containerName string) erro
 		},
 	})
 
+}
+
+// AddVolumeMountToContainer adds the given PVC to the given pod
+// at the given path
+// TODO: (rajivnathan) - volumes should be added to containers
+func AddVolumeMountToContainer(pod *corev1.Pod, volumeName, pvc string, containerMountPathsMap map[string][]string) error {
+
 	// Validating pod.Spec.Containers[] is present before dereferencing
 	if len(pod.Spec.Containers) == 0 {
 		return fmt.Errorf("Pod %s doesn't have any Containers defined", pod.Name)
 	}
 
-	for i, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-				Name:      volumeName,
-				MountPath: path,
-				SubPath:   subPath,
-			},
-			)
-			pod.Spec.Containers[i] = container
+	for containerName, mountPaths := range containerMountPathsMap {
+		for i, container := range pod.Spec.Containers {
+			if container.Name == containerName {
+				for _, mountPath := range mountPaths {
+					container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+						Name:      volumeName,
+						MountPath: mountPath,
+						SubPath:   "",
+					},
+					)
+				}
+				pod.Spec.Containers[i] = container
+			}
 		}
 	}
 

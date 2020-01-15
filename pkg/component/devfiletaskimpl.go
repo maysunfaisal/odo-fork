@@ -202,9 +202,9 @@ func createComponentFromDevfile(Client *kclient.Client, df *devfile.Devfile, com
 
 	// Get a container reference for each container in the set
 	containers := []corev1.Container{}
-	volumes := []devfile.DockerimageVolume{}
-	containerVolumesMap := make(map[string][]string)
-	volumesPVCMap := make(map[string][]string)
+	// volumes := []devfile.DockerimageVolume{}
+	containerVolumesMap := make(map[string][]devfile.DockerimageVolume)
+	// volumePVCNameMap := make(map[string][]string)
 
 	for _, component := range df.Components {
 		if component.Type == "dockerimage" && component.Alias != nil {
@@ -215,66 +215,88 @@ func createComponentFromDevfile(Client *kclient.Client, df *devfile.Devfile, com
 
 			if component.Volumes != nil {
 				for _, volume := range component.Volumes {
-					containerVolumesMap[*component.Alias] = append(containerVolumesMap[*component.Alias], *volume.Name)
-					isVolumeShared := false
-					for _, vol := range volumes {
-						if *volume.Name == *vol.Name {
-							isVolumeShared = true
-							break
-						}
-					}
-					if !isVolumeShared {
-						volumes = append(volumes, volume)
-					}
+					fmt.Println("*component.Alias:", *component.Alias, "*volume.Name:", *volume.Name)
+					containerVolumesMap[*component.Alias] = append(containerVolumesMap[*component.Alias], volume)
+					// isVolumeShared := false
+					// for _, vol := range volumes {
+					// 	if *volume.Name == *vol.Name {
+					// 		isVolumeShared = true
+					// 		break
+					// 	}
+					// }
+					// if !isVolumeShared {
+					// 	volumes = append(volumes, volume)
+					// }
+					// volumes = append(volumes, volume)
 				}
 			}
 		}
 	}
 
 	for k, v := range containerVolumesMap {
-		fmt.Println("k:", k, "value:", v[0])
+		fmt.Println(">> containerVolumesMap k:", k, "values:", v)
 	}
 
-	devFilePVC, err := createPVCFromDevfile(Client, volumes, componentName, appName)
+	var uniqueVolumes []string
+	processedVolumes := make(map[string]bool)
+	for _, volumes := range containerVolumesMap {
+		for _, vol := range volumes {
+			if _, ok := processedVolumes[*vol.Name]; !ok {
+				processedVolumes[*vol.Name] = true
+				uniqueVolumes = append(uniqueVolumes, *vol.Name)
+			}
+		}
+	}
+
+	volumePVCMap, err := createPVCFromDevfile(Client, uniqueVolumes, componentName, appName)
 	if err != nil {
 		return nil, err
 	}
 
-	var pvcClaimName, mountPath, subPath []string
-	for _, vol := range volumes {
-		volumesPVCMap[*vol.Name] = append(volumesPVCMap[*vol.Name], devFilePVC[*vol.Name].Name)
-		pvcClaimName = append(pvcClaimName, devFilePVC[*vol.Name].Name)
-		mountPath = append(mountPath, *vol.ContainerPath)
-	}
+	// for _, vol := range uniqueVolumes {
+	// 	volumePVCNameMap[vol] = append(volumePVCNameMap[vol], volumePVCMap[vol].Name)
+	// }
 
-	for _, v := range pvcClaimName {
-		fmt.Println("pvc name:", v)
-	}
+	// var pvcClaimName, mountPath, subPath []string
+	// for _, vol := range volumes {
+	// 	pvcClaimName = append(pvcClaimName, devFilePVC[*vol.Name].Name)
+	// 	mountPath = append(mountPath, *vol.ContainerPath)
+	// }
+	// for _, volumes := range containerVolumesMap {
+	// 	for _, vol := range volumes {
+	// 		pvcClaimName = append(pvcClaimName, devFilePVC[*vol.Name].Name)
+	// 		mountPath = append(mountPath, *vol.ContainerPath)
+	// 	}
+	// }
 
-	for k, v := range volumesPVCMap {
-		fmt.Println("k:", k, "value:", v[0])
-	}
+	// for _, v := range pvcClaimName {
+	// 	fmt.Println(">> pvc name:", v)
+	// }
+
+	// for k, v := range volumePVCNameMap {
+	// 	fmt.Println(">> volumePVCNameMap k:", k, "value:", v[0])
+	// }
 
 	if len(containers) == 0 {
 		return nil, errors.New("No containers defined")
 	}
 
 	// Create a pod that includes all of the containers
-	po, err := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers, pvcClaimName, mountPath, subPath, containerVolumesMap, volumesPVCMap)
+	po, err := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers, containerVolumesMap, volumePVCMap)
 
 	return po, err
 
 }
 
-func createPVCFromDevfile(Client *kclient.Client, volumes []devfile.DockerimageVolume, componentName, appName string) (map[string]*corev1.PersistentVolumeClaim, error) {
-	devFilePVC := make(map[string]*corev1.PersistentVolumeClaim)
+func createPVCFromDevfile(Client *kclient.Client, volumes []string, componentName, appName string) (map[string]*corev1.PersistentVolumeClaim, error) {
+	volumePVCMap := make(map[string]*corev1.PersistentVolumeClaim)
 
 	size := "1Gi"
 
 	for _, vol := range volumes {
-		// fmt.Println("Name:", *vol.Name, "Path:", *vol.ContainerPath)
+		fmt.Println(">> Creating PVC for :", vol)
 
-		PVCs, err := Client.GetPVCsFromSelector("app.kubernetes.io/component-name=" + componentName + ",app.kubernetes.io/storage-name=" + *vol.Name)
+		PVCs, err := Client.GetPVCsFromSelector("app.kubernetes.io/component-name=" + componentName + ",app.kubernetes.io/storage-name=" + vol)
 		if err != nil {
 			glog.V(0).Infof("Error occured while getting the PVC")
 			err = errors.New("Unable to get the PVC: " + err.Error())
@@ -282,11 +304,11 @@ func createPVCFromDevfile(Client *kclient.Client, volumes []devfile.DockerimageV
 		}
 		if len(PVCs) == 1 {
 			existingPVC := &PVCs[0]
-			devFilePVC[*vol.Name] = existingPVC
+			volumePVCMap[vol] = existingPVC
 		}
 		if len(PVCs) == 0 {
-			createdPVC, err := storage.Create(Client, *vol.Name, size, componentName, appName)
-			devFilePVC[*vol.Name] = createdPVC
+			createdPVC, err := storage.Create(Client, vol, size, componentName, appName)
+			volumePVCMap[vol] = createdPVC
 			if err != nil {
 				glog.V(0).Infof("Error creating the PVC: " + err.Error())
 				err = errors.New("Error creating the PVC: " + err.Error())
@@ -295,5 +317,5 @@ func createPVCFromDevfile(Client *kclient.Client, volumes []devfile.DockerimageV
 		}
 	}
 
-	return devFilePVC, nil
+	return volumePVCMap, nil
 }

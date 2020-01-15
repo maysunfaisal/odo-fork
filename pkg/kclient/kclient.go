@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/redhat-developer/odo-fork/pkg/config"
+	"github.com/redhat-developer/odo-fork/pkg/devfile"
 	"github.com/redhat-developer/odo-fork/pkg/log"
 	"github.com/redhat-developer/odo-fork/pkg/preference"
 	"github.com/redhat-developer/odo-fork/pkg/util"
@@ -614,7 +615,7 @@ func GenerateContainerSpec(name, image string, isPrivileged bool) corev1.Contain
 }
 
 // GeneratePodSpec generates the pod spec
-func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[string]string, containers []corev1.Container, pvcNames, mountPath, subPath []string, containerVolumesMap, volumesPVCMap map[string][]string) (*corev1.Pod, error) {
+func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[string]string, containers []corev1.Container, containerVolumesMap map[string][]devfile.DockerimageVolume, volumePVCMap map[string]*corev1.PersistentVolumeClaim) (*corev1.Pod, error) {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -631,25 +632,61 @@ func GeneratePodSpec(podName, namespace, serviceAccountName string, labels map[s
 		},
 	}
 
-	for i, pvcName := range pvcNames {
-		var volName, containerName string
-		for k, v := range volumesPVCMap {
-			if v[0] == pvcName {
-				volName = k
-				break
+	for vol, pvc := range volumePVCMap {
+		pvcName := pvc.Name
+		fmt.Println(">> Adding pvc to pod: ", pvcName)
+		generatedVolumeName := generateVolumeNameFromPVC(pvcName)
+		AddPVCToPod(pod, pvcName, generatedVolumeName)
+
+		// Loop through the containerVolumesMap map and generate the containerMountPathsMap map for the given volume
+		containerMountPathsMap := make(map[string][]string)
+		for containerName, volumes := range containerVolumesMap {
+			for _, volume := range volumes {
+				if vol == *volume.Name {
+					containerMountPathsMap[containerName] = append(containerMountPathsMap[containerName], *volume.ContainerPath)
+				}
 			}
 		}
-		for k, v := range containerVolumesMap {
-			if v[0] == volName {
-				containerName = k
-				break
-			}
-		}
-		err := AddPVCToPod(pod, pvcName, mountPath[i], "", containerName)
+
+		fmt.Println(">> Adding vol mount to containers for vol: ", vol)
+		err := AddVolumeMountToContainer(pod, generatedVolumeName, pvcName, containerMountPathsMap)
 		if err != nil {
 			return nil, errors.New("Unable to add volumes to the pod: " + err.Error())
 		}
 	}
+
+	// for i, pvcName := range pvcNames {
+
+	// 	// Get a list of all the containers using a volume
+	// 	var volName string
+	// 	var containerList []string
+	// 	for k, v := range volumesPVCMap {
+	// 		if v[0] == pvcName {
+	// 			volName = k
+	// 			break
+	// 		}
+	// 	}
+	// 	for k, v := range containerVolumesMap {
+	// 		for _, vol := range v {
+	// 			if vol == volName {
+	// 				containerList = append(containerList, k)
+	// 			}
+	// 		}
+
+	// 	}
+
+	// 	generatedVolumeName := generateVolumeNameFromPVC(pvcName)
+
+	// 	AddPVCToPod(pod, pvcName, generatedVolumeName)
+
+	// 	for _, container := range containerList {
+	// 		fmt.Println(">> Adding pvc ", pvcName, " to pod and to container:", container)
+	// 		err := AddVolumeMountToContainer(pod, generatedVolumeName, pvcName, mountPath[i], "", container)
+	// 		if err != nil {
+	// 			return nil, errors.New("Unable to add volumes to the pod: " + err.Error())
+	// 		}
+	// 	}
+	// }
 	return pod, nil
 }
 
