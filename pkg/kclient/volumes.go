@@ -72,12 +72,8 @@ func (c *Client) AddPVCToDeployment(dep *appsv1.Deployment, pvc string, path, su
 	return nil
 }
 
-// AddPVCToPod adds the given PVC to the given pod
-// at the given path
-// TODO: (rajivnathan) - volumes should be added to containers
-func AddPVCToPod(pod *corev1.Pod, pvc, volumeName string) {
-
-	// fmt.Println("volumeName:", volumeName)
+// AddPVCToPodSpec adds the given PVC to the given pod
+func AddPVCToPodSpec(pod *corev1.Pod, pvc, volumeName string) {
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 		Name: volumeName,
@@ -90,10 +86,8 @@ func AddPVCToPod(pod *corev1.Pod, pvc, volumeName string) {
 
 }
 
-// AddVolumeMountToContainer adds the given PVC to the given pod
-// at the given path
-// TODO: (rajivnathan) - volumes should be added to containers
-func AddVolumeMountToContainer(pod *corev1.Pod, volumeName, pvc string, containerMountPathsMap map[string][]string) error {
+// AddVolumeMountToPodContainerSpec adds the Volume Mounts for the containers for a given PVC
+func AddVolumeMountToPodContainerSpec(pod *corev1.Pod, volumeName, pvc string, containerMountPathsMap map[string][]string) error {
 
 	// Validating pod.Spec.Containers[] is present before dereferencing
 	if len(pod.Spec.Containers) == 0 {
@@ -116,12 +110,6 @@ func AddVolumeMountToContainer(pod *corev1.Pod, volumeName, pvc string, containe
 		}
 	}
 
-	// pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-	// 	Name:      volumeName,
-	// 	MountPath: path,
-	// 	SubPath:   subPath,
-	// },
-	// )
 	return nil
 }
 

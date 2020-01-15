@@ -6,7 +6,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/redhat-developer/odo-fork/pkg/config"
-	"github.com/redhat-developer/odo-fork/pkg/devfile"
 	"github.com/redhat-developer/odo-fork/pkg/idp"
 	"github.com/redhat-developer/odo-fork/pkg/kclient"
 	"github.com/redhat-developer/odo-fork/pkg/log"
@@ -213,11 +212,9 @@ func createComponentFromIDP(devPack *idp.IDP, namespace, serviceAccount string, 
 		return nil, errors.New("No containers defined")
 	}
 
-	containerVolumesMap := make(map[string][]devfile.DockerimageVolume)
-	volumePVCMap := make(map[string]*corev1.PersistentVolumeClaim)
 	// Create a pod that includes all of the containers
-	po, err := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers, containerVolumesMap, volumePVCMap)
+	po := kclient.GeneratePodSpec("fatpod", namespace, serviceAccount, labels, containers)
 
-	return po, err
+	return po, nil
 
 }
