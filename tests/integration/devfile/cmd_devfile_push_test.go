@@ -91,11 +91,11 @@ var _ = Describe("odo devfile push command tests", func() {
 
 			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
 			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
-
 			Expect(output).To(ContainSubstring("No file changes detected, skipping build"))
-			helper.ReplaceString(filepath.Join(context, "server.js"), "node listening on", "UPDATED!")
 
-			helper.CmdShouldPass("odo", "push", "--context", filepath.Join(context, "nodejs-ex"), "--namespace", namespace)
+			helper.ReplaceString(filepath.Join(context, "app", "app.js"), "Hello World!", "UPDATED!")
+			output = helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			// fmt.Printf("MJF %v", output)
 		})
 
 		It("should be able to create a file, push, delete, then push again propagating the deletions", func() {
@@ -142,7 +142,7 @@ var _ = Describe("odo devfile push command tests", func() {
 			// Devfile push requires experimental mode to be set
 			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
 
-			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs-multicontainer"), context)
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
 			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
 
 			// component name is currently equal to directory name until odo create for devfiles is implemented
@@ -155,39 +155,51 @@ var _ = Describe("odo devfile push command tests", func() {
 			oc.CheckCmdOpInRemoteDevfilePod(
 				podName,
 				namespace,
-				[]string{"stat", "/projects/server.js"},
+				[]string{"stat", "/projects/app/app.js"},
 				func(cmdOp string, err error) bool {
 					statErr = err
 					return true
 				},
 			)
 			Expect(statErr).ToNot(HaveOccurred())
-			Expect(os.Remove(filepath.Join(context, "server.js"))).NotTo(HaveOccurred())
+			Expect(os.Remove(filepath.Join(context, "app", "app.js"))).NotTo(HaveOccurred())
 			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
 
 			oc.CheckCmdOpInRemoteDevfilePod(
 				podName,
 				namespace,
-				[]string{"stat", "/projects/server.js"},
+				[]string{"stat", "/projects/app/app.js"},
 				func(cmdOp string, err error) bool {
 					statErr = err
 					return true
 				},
 			)
 			Expect(statErr).To(HaveOccurred())
-			Expect(statErr.Error()).To(ContainSubstring("cannot stat '/projects/server.js': No such file or directory"))
+			Expect(statErr.Error()).To(ContainSubstring("cannot stat '/projects/app/app.js': No such file or directory"))
 		})
 
 		It("should build when no changes are detected in the directory and force flag is enabled", func() {
 			// Devfile push requires experimental mode to be set
 			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
 
-			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs-multicontainer"), context)
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
 			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
 
 			// use the force build flag and push
 			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace, "-f")
 			Expect(output).To(Not(ContainSubstring("No file changes detected, skipping build")))
+		})
+
+		It("should execute the default devbuild and devrun commands if present", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			// Create a new file that we plan on deleting later...
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+
+			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			Expect(output).To(ContainSubstring("Executing devbuild command npm install"))
+			Expect(output).To(ContainSubstring("Executing devrun command nodemon app.js"))
 		})
 
 	})
