@@ -45,26 +45,6 @@ var _ = Describe("odo devfile push command tests", func() {
 
 	Context("Verify devfile push works", func() {
 
-		It("should have no errors when no endpoints within the devfile, should create a service when devfile has endpoints", func() {
-			// Devfile push requires experimental mode to be set
-			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
-
-			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
-			helper.RenameFile("devfile.yaml", "devfile-old.yaml")
-			helper.RenameFile("devfile-no-endpoints.yaml", "devfile.yaml")
-			componentName := path.Base(context)
-			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
-			output := oc.GetServices(namespace)
-			Expect(output).NotTo(ContainSubstring(componentName))
-
-			helper.RenameFile("devfile-old.yaml", "devfile.yaml")
-			output = helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
-
-			Expect(output).To(ContainSubstring("Changes successfully pushed to component"))
-			output = oc.GetServices(namespace)
-			Expect(output).To(ContainSubstring(componentName))
-		})
-
 		It("Check that odo push works with a devfile", func() {
 			// Devfile push requires experimental mode to be set
 			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
@@ -81,7 +61,7 @@ var _ = Describe("odo devfile push command tests", func() {
 
 	})
 
-	Context("when devfile push command is executed", func() {
+	Context("When devfile push command is executed", func() {
 
 		It("should not build when no changes are detected in the directory and build when a file change is detected", func() {
 			// Devfile push requires experimental mode to be set
@@ -102,9 +82,9 @@ var _ = Describe("odo devfile push command tests", func() {
 			// Devfile push requires experimental mode to be set
 			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
 
-			// Create a new file that we plan on deleting later...
 			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
 
+			// Create a new file that we plan on deleting later...
 			newFilePath := filepath.Join(context, "foobar.txt")
 			if err := helper.CreateFileWithContent(newFilePath, "hello world"); err != nil {
 				fmt.Printf("the foobar.txt file was not created, reason %v", err.Error())
@@ -190,16 +170,87 @@ var _ = Describe("odo devfile push command tests", func() {
 			Expect(output).To(Not(ContainSubstring("No file changes detected, skipping build")))
 		})
 
+		It("should have no errors when no endpoints within the devfile, should create a service when devfile has endpoints", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+			helper.RenameFile("devfile.yaml", "devfile-old.yaml")
+			helper.RenameFile("devfile-no-endpoints.yaml", "devfile.yaml")
+			componentName := path.Base(context)
+			helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			output := oc.GetServices(namespace)
+			Expect(output).NotTo(ContainSubstring(componentName))
+
+			helper.RenameFile("devfile-old.yaml", "devfile.yaml")
+			output = helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+
+			Expect(output).To(ContainSubstring("Changes successfully pushed to component"))
+			output = oc.GetServices(namespace)
+			Expect(output).To(ContainSubstring(componentName))
+		})
+
 		It("should execute the default devbuild and devrun commands if present", func() {
 			// Devfile push requires experimental mode to be set
 			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
 
-			// Create a new file that we plan on deleting later...
 			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
 
 			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
 			Expect(output).To(ContainSubstring("Executing devbuild command npm install"))
 			Expect(output).To(ContainSubstring("Executing devrun command nodemon app.js"))
+		})
+
+		It("should be able to handle a missing devbuild command", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+			helper.RenameFile("devfile.yaml", "devfile-old.yaml")
+			helper.RenameFile("devfile-without-devbuild.yaml", "devfile.yaml")
+
+			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			Expect(output).NotTo(ContainSubstring("Executing devbuild command"))
+			Expect(output).To(ContainSubstring("Executing devrun command npm install && nodemon app.js"))
+		})
+
+		It("should error out on a missing devrun command", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+
+			// Rename the devrun command
+			helper.ReplaceString(filepath.Join(context, "devfile.yaml"), "devrun", "randomcommand")
+
+			output := helper.CmdShouldFail("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			Expect(output).NotTo(ContainSubstring("Executing devrun command"))
+			Expect(output).To(ContainSubstring("Failed to start component with name"))
+			Expect(output).To(ContainSubstring("The command \"devrun\" was not found in the devfile"))
+		})
+
+		It("should be able to push using the custom commands", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+
+			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace, "--build-command", "build", "--run-command", "run")
+			Expect(output).To(ContainSubstring("Executing build command npm install"))
+			Expect(output).To(ContainSubstring("Executing run command nodemon app.js"))
+		})
+
+		It("should error out on a wrong custom commands", func() {
+			garbageCommand := "buildgarbage"
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+
+			output := helper.CmdShouldFail("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace, "--build-command", garbageCommand)
+			Expect(output).NotTo(ContainSubstring("Executing buildgarbage command"))
+			Expect(output).To(ContainSubstring("Failed to start component with name"))
+			Expect(output).To(ContainSubstring("The command \"%v\" was not found in the devfile", garbageCommand))
 		})
 
 	})
