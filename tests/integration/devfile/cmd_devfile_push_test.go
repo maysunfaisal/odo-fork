@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/openshift/odo/tests/helper"
@@ -134,6 +135,7 @@ var _ = Describe("odo devfile push command tests", func() {
 			var statErr error
 			oc.CheckCmdOpInRemoteDevfilePod(
 				podName,
+				"",
 				namespace,
 				[]string{"stat", "/projects/app/app.js"},
 				func(cmdOp string, err error) bool {
@@ -147,6 +149,7 @@ var _ = Describe("odo devfile push command tests", func() {
 
 			oc.CheckCmdOpInRemoteDevfilePod(
 				podName,
+				"",
 				namespace,
 				[]string{"stat", "/projects/app/app.js"},
 				func(cmdOp string, err error) bool {
@@ -251,6 +254,67 @@ var _ = Describe("odo devfile push command tests", func() {
 			Expect(output).NotTo(ContainSubstring("Executing buildgarbage command"))
 			Expect(output).To(ContainSubstring("Failed to start component with name"))
 			Expect(output).To(ContainSubstring("The command \"%v\" was not found in the devfile", garbageCommand))
+		})
+
+		It("should create pvc and reuse if it shares the same devfile volume name", func() {
+			// Devfile push requires experimental mode to be set
+			helper.CmdShouldPass("odo", "preference", "set", "Experimental", "true")
+
+			helper.CopyExample(filepath.Join("source", "devfiles", "nodejs"), context)
+			helper.RenameFile("devfile.yaml", "devfile-old.yaml")
+			helper.RenameFile("devfile-with-volumes.yaml", "devfile.yaml")
+
+			output := helper.CmdShouldPass("odo", "push", "--devfile", "devfile.yaml", "--namespace", namespace)
+			Expect(output).To(ContainSubstring("Executing devbuild command"))
+			Expect(output).To(ContainSubstring("Executing devrun command"))
+
+			// component name is currently equal to directory name until odo create for devfiles is implemented
+			cmpName := filepath.Base(context)
+
+			// Check to see if it's been pushed (foobar.txt abd directory testdir)
+			podName := oc.GetRunningPodNameByComponent(cmpName, namespace)
+
+			var statErr error
+			var cmdOutput string
+			oc.CheckCmdOpInRemoteDevfilePod(
+				podName,
+				"runtime2",
+				namespace,
+				[]string{"cat", "/data/myfile.log"},
+				func(cmdOp string, err error) bool {
+					cmdOutput = cmdOp
+					statErr = err
+					return true
+				},
+			)
+			Expect(statErr).ToNot(HaveOccurred())
+			Expect(cmdOutput).To(ContainSubstring("hello"))
+
+			oc.CheckCmdOpInRemoteDevfilePod(
+				podName,
+				"runtime2",
+				namespace,
+				[]string{"stat", "/data2"},
+				func(cmdOp string, err error) bool {
+					statErr = err
+					return true
+				},
+			)
+			Expect(statErr).ToNot(HaveOccurred())
+
+			volumesMatched := false
+
+			// check the volume name and mount paths for the containers
+			volNamesAndPaths := oc.GetVolumeMountNamesandPathsFromContainer(cmpName, "runtime", namespace)
+			volNamesAndPathsArr := strings.Fields(volNamesAndPaths)
+			for _, volNamesAndPath := range volNamesAndPathsArr {
+				volNamesAndPathArr := strings.Split(volNamesAndPath, ":")
+
+				if strings.Contains(volNamesAndPathArr[0], "myvol") && volNamesAndPathArr[1] == "/data" {
+					volumesMatched = true
+				}
+			}
+			Expect(volumesMatched).To(Equal(true))
 		})
 
 	})
