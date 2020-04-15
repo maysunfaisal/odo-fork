@@ -1,9 +1,13 @@
 package lclient
 
 import (
+	"io"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -82,4 +86,59 @@ func (dc *Client) GetContainerConfig(containerID string) (*container.Config, err
 	}
 
 	return containerJSON.Config, nil
+}
+
+//ExecCMDInContainer executes
+func (dc *Client) ExecCMDInContainer(podName string, containerID string, cmd []string, stdout io.Writer, stderr io.Writer, stdin io.Reader, tty bool) error {
+
+	execConfig := types.ExecConfig{
+		AttachStdin:  stdin != nil,
+		AttachStdout: stdout != nil,
+		AttachStderr: stderr != nil,
+		Cmd:          cmd,
+		WorkingDir:   "/tmp",
+	}
+
+	resp, err := dc.Client.ContainerExecCreate(dc.Context, containerID, execConfig)
+	if err != nil {
+		glog.V(3).Infof("MJF err 1 %v", err)
+		return err
+	}
+	// glog.V(3).Infof("MJF resp 1 %v", resp)
+
+	// execStartCheck := types.ExecStartCheck{
+	// 	Detach: true,
+	// 	Tty:    tty,
+	// }
+
+	// err = dc.Client.ContainerExecStart(dc.Context, resp.ID, execStartCheck)
+	// glog.V(3).Infof("MJF err 2 %v", err)
+
+	aresp, err := dc.Client.ContainerExecAttach(dc.Context, resp.ID, types.ExecStartCheck{})
+	if err != nil {
+		glog.V(3).Infof("MJF err 2 %v", err)
+		return err
+	}
+	defer aresp.Close()
+
+	// read the output
+	// var outBuf, errBuf bytes.Buffer
+	outputDone := make(chan error)
+
+	go func() {
+		// StdCopy demultiplexes the stream into two buffers
+		_, err = stdcopy.StdCopy(stdout, stderr, aresp.Reader)
+		outputDone <- err
+	}()
+
+	err = <-outputDone
+	if err != nil {
+		glog.V(3).Infof("MJF err 3 %v", err)
+		return err
+	}
+
+	// glog.V(3).Infof("MJF &stdout %v", stdout)
+	// glog.V(3).Infof("MJF &stderr %v", stderr)
+
+	return nil
 }
