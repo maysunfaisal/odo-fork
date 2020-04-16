@@ -41,7 +41,7 @@ func (a Adapter) Push(parameters common.PushParameters) (err error) {
 	cmd := []string{"/bin/sh", "-c", "./loop.sh"}
 	glog.V(3).Infof("MJF hola %v", cmd)
 	// err = a.Client.ExecCMDInContainer("", "ac758bf7fb60", cmd, nil, nil, nil, false)
-	err = exec.ExecuteCommand(&a.Client, "", "ac758bf7fb60", cmd, false)
+	err = exec.ExecuteCommand(&a.Client, "", "ac758bf7fb60", cmd, parameters.Show)
 	if err != nil {
 		return errors.Wrap(err, "unable to exec component")
 	}
