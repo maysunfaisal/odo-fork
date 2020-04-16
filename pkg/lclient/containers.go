@@ -1,9 +1,12 @@
 package lclient
 
 import (
+	"io"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
 )
 
@@ -82,4 +85,47 @@ func (dc *Client) GetContainerConfig(containerID string) (*container.Config, err
 	}
 
 	return containerJSON.Config, nil
+}
+
+//ExecCMDInContainer executes
+func (dc *Client) ExecCMDInContainer(podName string, containerID string, cmd []string, stdout io.Writer, stderr io.Writer, stdin io.Reader, tty bool) error {
+
+	execConfig := types.ExecConfig{
+		AttachStdin:  stdin != nil,
+		AttachStdout: stdout != nil,
+		AttachStderr: stderr != nil,
+		Cmd:          cmd,
+		WorkingDir:   "/tmp",
+	}
+
+	resp, err := dc.Client.ContainerExecCreate(dc.Context, containerID, execConfig)
+	if err != nil {
+		return err
+	}
+
+	// execStartCheck := types.ExecStartCheck{
+	// 	Detach: true,
+	// 	Tty:    tty,
+	// }
+
+	hresp, err := dc.Client.ContainerExecAttach(dc.Context, resp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return err
+	}
+	defer hresp.Close()
+
+	errorCh := make(chan error)
+
+	// read the output
+	go func() {
+		_, err = stdcopy.StdCopy(stdout, stderr, hresp.Reader)
+		errorCh <- err
+	}()
+
+	err = <-errorCh
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
