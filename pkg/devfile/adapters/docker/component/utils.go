@@ -10,6 +10,7 @@ import (
 	adaptersCommon "github.com/openshift/odo/pkg/devfile/adapters/common"
 	"github.com/openshift/odo/pkg/devfile/adapters/docker/utils"
 	versionsCommon "github.com/openshift/odo/pkg/devfile/parser/data/common"
+	"github.com/openshift/odo/pkg/lclient"
 	"github.com/openshift/odo/pkg/log"
 )
 
@@ -24,7 +25,8 @@ func (a Adapter) createComponent() (err error) {
 	}
 
 	// Create a docker volume to store the project source code
-	volume, err := a.Client.CreateVolume(volumeLabels)
+	// volume, err := a.Client.CreateVolume(volumeLabels)
+	volume, err := utils.CreateAndInitVolume(a.Client, lclient.OdoSourceVolumeMount, volumeLabels)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to create project source volume for component %s", componentName)
 	}
@@ -33,7 +35,7 @@ func (a Adapter) createComponent() (err error) {
 
 	// Loop over each component and start a container for it
 	for _, comp := range supportedComponents {
-		err = a.pullAndStartContainer(componentName, projectVolumeName, comp)
+		err = a.pullAndStartComponentContainer(componentName, projectVolumeName, comp)
 		if err != nil {
 			return errors.Wrapf(err, "unable to pull and start container %s for component %s", *comp.Alias, componentName)
 		}
@@ -72,7 +74,7 @@ func (a Adapter) updateComponent() (err error) {
 		}
 		if len(containers) == 0 {
 			// Container doesn't exist, so need to pull its image (to be safe) and start a new container
-			err = a.pullAndStartContainer(componentName, projectVolumeName, comp)
+			err = a.pullAndStartComponentContainer(componentName, projectVolumeName, comp)
 			if err != nil {
 				return errors.Wrapf(err, "unable to pull and start container %s for component %s", *comp.Alias, componentName)
 			}
@@ -97,7 +99,7 @@ func (a Adapter) updateComponent() (err error) {
 				}
 
 				// Start the container
-				err = a.startContainer(componentName, projectVolumeName, comp)
+				err = a.startComponentContainer(componentName, projectVolumeName, comp)
 				if err != nil {
 					return errors.Wrapf(err, "Unable to start container for devfile component %s", *comp.Alias)
 				}
@@ -113,11 +115,20 @@ func (a Adapter) updateComponent() (err error) {
 	return nil
 }
 
-func (a Adapter) pullAndStartContainer(componentName string, projectVolumeName string, comp versionsCommon.DevfileComponent) error {
+func (a Adapter) pullAndStartComponentContainer(componentName string, projectVolumeName string, comp versionsCommon.DevfileComponent) error {
+
+	// envVars := utils.ConvertEnvs(comp.Env)
+	// containerLabels := utils.GetComponentContainerLabels(componentName, *comp.Alias)
+
+	// err := utils.PullAndStartContainer(a.Client, *comp.Image, projectVolumeName, "", comp.Command, comp.Args, envVars, containerLabels)
+	// if err != nil {
+	// 	return err
+	// }
+
 	// Container doesn't exist, so need to pull its image (to be safe) and start a new container
 	s := log.Spinner("Pulling image " + *comp.Image)
 
-	err := a.Client.PullImage(*comp.Image)
+	err := utils.PullImage(a.Client, *comp.Image)
 	if err != nil {
 		s.End(false)
 		return errors.Wrapf(err, "Unable to pull %s image", *comp.Image)
@@ -125,7 +136,7 @@ func (a Adapter) pullAndStartContainer(componentName string, projectVolumeName s
 	s.End(true)
 
 	// Start the container
-	err = a.startContainer(componentName, projectVolumeName, comp)
+	err = a.startComponentContainer(componentName, projectVolumeName, comp)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to start container for devfile component %s", *comp.Alias)
 	}
@@ -133,19 +144,19 @@ func (a Adapter) pullAndStartContainer(componentName string, projectVolumeName s
 	return nil
 }
 
-func (a Adapter) startContainer(componentName string, projectVolumeName string, comp versionsCommon.DevfileComponent) error {
+func (a Adapter) startComponentContainer(componentName string, projectVolumeName string, comp versionsCommon.DevfileComponent) error {
 	containerConfig := a.generateAndGetContainerConfig(componentName, comp)
 	hostConfig := container.HostConfig{}
 
 	// If the component set `mountSources` to true, add the source volume to it
 	if comp.MountSources {
-		utils.AddProjectVolumeToComp(projectVolumeName, &hostConfig)
+		utils.AddVolumeToHostConfig(projectVolumeName, lclient.OdoSourceVolumeMount, &hostConfig)
 	}
 
 	// Create the docker container
 	s := log.Spinner("Starting container for " + *comp.Image)
 	defer s.End(false)
-	err := a.Client.StartContainer(&containerConfig, &hostConfig, nil)
+	_, err := utils.StartContainer(a.Client, &containerConfig, &hostConfig, nil)
 	if err != nil {
 		return err
 	}
@@ -157,11 +168,8 @@ func (a Adapter) generateAndGetContainerConfig(componentName string, comp versio
 	// Convert the env vars in the Devfile to the format expected by Docker
 	envVars := utils.ConvertEnvs(comp.Env)
 
-	containerLabels := map[string]string{
-		"component": componentName,
-		"alias":     *comp.Alias,
-	}
+	containerLabels := utils.GetComponentContainerLabels(componentName, *comp.Alias)
 
-	containerConfig := a.Client.GenerateContainerConfig(*comp.Image, comp.Command, comp.Args, envVars, containerLabels)
+	containerConfig := utils.GenerateContainerConfig(a.Client, *comp.Image, comp.Command, comp.Args, envVars, containerLabels)
 	return containerConfig
 }

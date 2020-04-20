@@ -9,6 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	VolumeInitContainerImage = "node:lts-slim"
+)
+
 // CreateVolume creates a Docker volume with the given labels and the default Docker storage driver
 func (dc *Client) CreateVolume(labels map[string]string) (types.Volume, error) {
 	volume, err := dc.Client.VolumeCreate(dc.Context, volumeTypes.VolumeCreateBody{

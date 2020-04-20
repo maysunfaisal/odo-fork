@@ -53,18 +53,18 @@ func (dc *Client) GetContainerList() ([]types.Container, error) {
 // hostConfig - configurations related to the host (volume mounts, exposed ports, etc) (if needed)
 // networkingConfig - endpoints to expose (if needed)
 // Returns an error if the container couldn't be started.
-func (dc *Client) StartContainer(containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig) error {
+func (dc *Client) StartContainer(containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig) (string, error) {
 	resp, err := dc.Client.ContainerCreate(dc.Context, containerConfig, hostConfig, networkingConfig, "")
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Start the container
 	if err := dc.Client.ContainerStart(dc.Context, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return err
+		return resp.ID, err
 	}
 
-	return nil
+	return resp.ID, nil
 }
 
 // RemoveContainer takes in a given container ID and kills it, then removes it.
