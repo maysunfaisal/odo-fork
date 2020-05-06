@@ -253,9 +253,18 @@ func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
 	}
 
 	supervisordLabels := GetSupervisordVolumeLabels()
-	_, err = client.CreateVolume(supervisordVolumeName, supervisordLabels)
+	supervisordVolumes, err := client.GetVolumesByLabel(supervisordLabels)
 	if err != nil {
-		return "", errors.Wrapf(err, "Unable to create supervisord volume for component")
+		return "", errors.Wrapf(err, "unable to retrieve supervisord volume for component")
+	}
+
+	if len(supervisordVolumes) == 0 {
+		_, err := client.CreateVolume(supervisordVolumeName, supervisordLabels)
+		if err != nil {
+			return "", errors.Wrapf(err, "Unable to create supervisord volume for component")
+		}
+	} else {
+		supervisordVolumeName = supervisordVolumes[0].Name
 	}
 
 	err = StartBootstrapSupervisordInitContainer(client, supervisordVolumeName)

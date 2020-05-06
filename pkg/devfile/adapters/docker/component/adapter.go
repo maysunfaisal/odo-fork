@@ -62,19 +62,24 @@ func (a Adapter) Push(parameters common.PushParameters) (err error) {
 	}
 	s.End(true)
 
-	// Get the supervisord volume
-	supervisordLabels := utils.GetSupervisordVolumeLabels()
-	supervisordVolumes, err := a.Client.GetVolumesByLabel(supervisordLabels)
+	// // Get the supervisord volume
+	// supervisordLabels := utils.GetSupervisordVolumeLabels()
+	// supervisordVolumes, err := a.Client.GetVolumesByLabel(supervisordLabels)
+	// if err != nil {
+	// 	return errors.Wrapf(err, "unable to retrieve supervisord volume for component %s", a.ComponentName)
+	// }
+	// if len(supervisordVolumes) == 0 {
+	// 	a.supervisordVolumeName, err = utils.CreateAndInitSupervisordVolume(a.Client)
+	// 	if err != nil {
+	// 		return errors.Wrapf(err, "unable to create supervisord volume for component %s", a.ComponentName)
+	// 	}
+	// } else {
+	// 	a.supervisordVolumeName = supervisordVolumes[0].Name
+	// }
+
+	a.supervisordVolumeName, err = utils.CreateAndInitSupervisordVolume(a.Client)
 	if err != nil {
-		return errors.Wrapf(err, "unable to retrieve supervisord volume for component %s", a.ComponentName)
-	}
-	if len(supervisordVolumes) == 0 {
-		a.supervisordVolumeName, err = utils.CreateAndInitSupervisordVolume(a.Client)
-		if err != nil {
-			return errors.Wrapf(err, "unable to create supervisord volume for component %s", a.ComponentName)
-		}
-	} else {
-		a.supervisordVolumeName = supervisordVolumes[0].Name
+		return errors.Wrapf(err, "unable to create supervisord volume for component %s", a.ComponentName)
 	}
 
 	if componentExists {
