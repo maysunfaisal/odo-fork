@@ -244,26 +244,31 @@ func TestStartContainer(t *testing.T) {
 
 	fakeContainer := container.Config{}
 	tests := []struct {
-		name    string
-		client  *Client
-		wantErr bool
+		name            string
+		client          *Client
+		wantContainerID string
+		wantErr         bool
 	}{
 		{
-			name:    "Case 1: Successfully start container",
-			client:  fakeClient,
-			wantErr: false,
+			name:            "Case 1: Successfully start container",
+			client:          fakeClient,
+			wantContainerID: "golang",
+			wantErr:         false,
 		},
 		{
-			name:    "Case 2: Fail to start",
-			client:  fakeErrorClient,
-			wantErr: true,
+			name:            "Case 2: Fail to start",
+			client:          fakeErrorClient,
+			wantContainerID: "",
+			wantErr:         true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.client.StartContainer(&fakeContainer, nil, nil)
+			containerID, err := tt.client.StartContainer(&fakeContainer, nil, nil)
 			if !tt.wantErr == (err != nil) {
-				t.Errorf("expected %v, wanted %v", err, tt.wantErr)
+				t.Errorf("TestStartContainer error: expected %v, wanted %v", err, tt.wantErr)
+			} else if !tt.wantErr && containerID != tt.wantContainerID {
+				t.Errorf("TestStartContainer error: container id of start container did not match: got %v, wanted %v", containerID, tt.wantContainerID)
 			}
 		})
 	}

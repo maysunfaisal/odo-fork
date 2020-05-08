@@ -313,12 +313,17 @@ func StartBootstrapSupervisordInitContainer(client lclient.Client, supervisordVo
 		s = log.Spinnerf("Starting container for %s", image)
 		defer s.End(false)
 	}
-	err = client.StartContainer(&containerConfig, &hostConfig, nil)
+	containerID, err := client.StartContainer(&containerConfig, &hostConfig, nil)
 	if err != nil {
 		return err
 	}
 	if log.IsDebug() {
 		s.End(true)
+	}
+
+	err = client.RemoveContainer(containerID)
+	if err != nil {
+		return errors.Wrapf(err, "unable to remove supervisord init container %s", containerID)
 	}
 
 	return nil

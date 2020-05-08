@@ -256,7 +256,7 @@ func (a Adapter) startComponent(mounts []mount.Mount, projectVolumeName string, 
 	// Create the docker container
 	s := log.Spinner("Starting container for " + *comp.Image)
 	defer s.End(false)
-	err = a.Client.StartContainer(&containerConfig, &hostConfig, nil)
+	_, err = a.Client.StartContainer(&containerConfig, &hostConfig, nil)
 	if err != nil {
 		return err
 	}
