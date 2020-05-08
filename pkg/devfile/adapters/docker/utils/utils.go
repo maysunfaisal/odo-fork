@@ -240,6 +240,37 @@ func UpdateComponentWithSupervisord(comp *common.DevfileComponent, runCommand co
 	}
 }
 
+// CreateAndGetProjectVolume creates a project volume if absent and returns the
+// name of the created project volume
+func CreateAndGetProjectVolume(client lclient.Client, componentName string) (string, error) {
+	var projectVolumeName string
+
+	// Get the project source volume
+	projectVolumeLabels := GetProjectVolumeLabels(componentName)
+	projectVols, err := client.GetVolumesByLabel(projectVolumeLabels)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to retrieve source volume for component "+componentName)
+	}
+
+	if len(projectVols) == 0 {
+		// A source volume needs to be created
+		projectVolumeName, err = storage.GenerateVolNameFromDevfileVol("odo-project-source", componentName)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to generate project source volume name for component %s", componentName)
+		}
+		_, err := client.CreateVolume(projectVolumeName, projectVolumeLabels)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to create project source volume for component %s", componentName)
+		}
+	} else if len(projectVols) == 1 {
+		projectVolumeName = projectVols[0].Name
+	} else if len(projectVols) > 1 {
+		return "", errors.New(fmt.Sprintf("multiple source volumes found for component %s", componentName))
+	}
+
+	return projectVolumeName, nil
+}
+
 // CreateAndInitSupervisordVolume creates the supervisord volume and initializes
 // it with supervisord bootstrap image - assembly files and supervisord binary
 func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
@@ -261,7 +292,7 @@ func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
 	if len(supervisordVolumes) == 0 {
 		_, err := client.CreateVolume(supervisordVolumeName, supervisordLabels)
 		if err != nil {
-			return "", errors.Wrapf(err, "Unable to create supervisord volume for component")
+			return "", errors.Wrapf(err, "unable to create supervisord volume for component")
 		}
 	} else {
 		supervisordVolumeName = supervisordVolumes[0].Name
@@ -269,7 +300,7 @@ func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
 
 	err = StartBootstrapSupervisordInitContainer(client, supervisordVolumeName)
 	if err != nil {
-		return "", errors.Wrapf(err, "Unable to start supervisord container for component")
+		return "", errors.Wrapf(err, "unable to start supervisord container for component")
 	}
 	s.End(true)
 
