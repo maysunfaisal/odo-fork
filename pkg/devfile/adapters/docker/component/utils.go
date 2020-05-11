@@ -34,29 +34,6 @@ func (a Adapter) createComponent() (err error) {
 
 	log.Infof("\nCreating Docker resources for component %s", a.ComponentName)
 
-	// // Get or create the project source volume
-	// var projectVolumeName string
-	// projectVolumeLabels := utils.GetProjectVolumeLabels(componentName)
-	// projectVols, err := a.Client.GetVolumesByLabel(projectVolumeLabels)
-	// if err != nil {
-	// 	return errors.Wrapf(err, "Unable to retrieve source volume for component "+componentName)
-	// }
-	// if len(projectVols) == 0 {
-	// 	// A source volume needs to be created
-	// 	projectVolumeName, err = storage.GenerateVolNameFromDevfileVol("odo-project-source", a.ComponentName)
-	// 	if err != nil {
-	// 		return errors.Wrapf(err, "Unable to generate project source volume name for component %s", componentName)
-	// 	}
-	// 	_, err := a.Client.CreateVolume(projectVolumeName, projectVolumeLabels)
-	// 	if err != nil {
-	// 		return errors.Wrapf(err, "Unable to create project source volume for component %s", componentName)
-	// 	}
-	// } else if len(projectVols) == 1 {
-	// 	projectVolumeName = projectVols[0].Name
-	// } else if len(projectVols) > 1 {
-	// 	return errors.Wrapf(err, "Error, multiple source volumes found for component %s", componentName)
-	// }
-
 	projectVolumeName, err := utils.CreateAndGetProjectVolume(a.Client, componentName)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to determine the project source volume for component %s", componentName)
@@ -99,35 +76,6 @@ func (a Adapter) updateComponent() (componentExists bool, err error) {
 	klog.V(3).Info("The component already exists, attempting to update it")
 	componentExists = true
 	componentName := a.ComponentName
-
-	// // Get the project source volume
-	// projectVolumeLabels := utils.GetProjectVolumeLabels(componentName)
-	// projectVols, err := a.Client.GetVolumesByLabel(projectVolumeLabels)
-	// if err != nil {
-	// 	return componentExists, errors.Wrapf(err, "Unable to retrieve source volume for component "+componentName)
-	// }
-	// if len(projectVols) == 0 {
-	// 	return componentExists, fmt.Errorf("Unable to find source volume for component %s", componentName)
-	// } else if len(projectVols) > 1 {
-	// 	return componentExists, errors.Wrapf(err, "Error, multiple source volumes found for component %s", componentName)
-	// }
-	// var projectVolumeName string
-	// if len(projectVols) == 0 {
-	// 	// A source volume needs to be created
-	// 	projectVolumeName, err = storage.GenerateVolNameFromDevfileVol("odo-project-source", a.ComponentName)
-	// 	if err != nil {
-	// 		return componentExists, errors.Wrapf(err, "Unable to generate project source volume name for component %s", componentName)
-	// 	}
-	// 	_, err := a.Client.CreateVolume(projectVolumeName, projectVolumeLabels)
-	// 	if err != nil {
-	// 		return componentExists, errors.Wrapf(err, "Unable to create project source volume for component %s", componentName)
-	// 	}
-	// } else if len(projectVols) == 1 {
-	// 	projectVolumeName = projectVols[0].Name
-	// } else if len(projectVols) > 1 {
-	// 	return componentExists, errors.Wrapf(err, "Error, multiple source volumes found for component %s", componentName)
-	// }
-	// projectVolumeName := projectVols[0].Name
 
 	projectVolumeName, err := utils.CreateAndGetProjectVolume(a.Client, componentName)
 	if err != nil {
