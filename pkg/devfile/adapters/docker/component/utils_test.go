@@ -105,11 +105,11 @@ func TestUpdateComponent(t *testing.T) {
 			wantErr:       true,
 		},
 		{
-			name:          "Case 3: Valid devfile, missing component",
+			name:          "Case 3: Odo component does not exist", // should create proj vols and pull image if its the case
 			componentType: versionsCommon.DevfileComponentTypeDockerimage,
 			componentName: "fakecomponent",
 			client:        fakeClient,
-			wantErr:       true,
+			wantErr:       false,
 		},
 	}
 	for _, tt := range tests {

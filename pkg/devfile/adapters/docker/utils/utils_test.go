@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/docker/go-connections/nat"
@@ -1137,4 +1138,57 @@ func TestGetContainerIDForAlias(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCreateAndGetProjectVolume(t *testing.T) {
+	fakeClient := lclient.FakeNew()
+	fakeErrorClient := lclient.FakeErrorNew()
+
+	tests := []struct {
+		name           string
+		componentName  string
+		client         *lclient.Client
+		wantVolumeName string
+		wantErr        bool
+	}{
+		{
+			name:           "Case 1: Volume does not exist",
+			componentName:  "somecomponent",
+			client:         fakeClient,
+			wantVolumeName: projectSourceVolumeName + "-somecomponent",
+			wantErr:        false,
+		},
+		{
+			name:           "Case 2: Volume exist",
+			componentName:  "test",
+			client:         fakeClient,
+			wantVolumeName: projectSourceVolumeName + "-test",
+			wantErr:        false,
+		},
+		{
+			name:           "Case 3: More than one project volume exist",
+			componentName:  "duplicate",
+			client:         fakeClient,
+			wantVolumeName: "",
+			wantErr:        true,
+		},
+		{
+			name:           "Case 4: Client error",
+			componentName:  "random",
+			client:         fakeErrorClient,
+			wantVolumeName: "",
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			volumeName, err := CreateAndGetProjectVolume(*tt.client, tt.componentName)
+			if !tt.wantErr && err != nil {
+				t.Errorf("TestCreateAndGetProjectVolume error: Unexpected error: %v", err)
+			} else if !tt.wantErr && !strings.Contains(volumeName, tt.wantVolumeName) {
+				t.Errorf("TestCreateAndGetProjectVolume error: project volume name did not match, expected: %v got: %v", tt.wantVolumeName, volumeName)
+			}
+		})
+	}
 }

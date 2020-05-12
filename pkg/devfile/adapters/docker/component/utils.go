@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	LocalhostIP             = "127.0.0.1"
-	projectSourceVolumeName = "odo-project-source"
+	localhostIP = "127.0.0.1"
 )
 
 func (a Adapter) createComponent() (err error) {

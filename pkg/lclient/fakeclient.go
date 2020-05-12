@@ -195,6 +195,21 @@ func (m *mockDockerClient) VolumeList(ctx context.Context, filter filters.Args) 
 					"component": "test",
 					"type":      "projects",
 				},
+				Name: "odo-project-source-test",
+			},
+			{
+				Labels: map[string]string{
+					"component": "duplicate",
+					"type":      "projects",
+				},
+				Name: "odo-project-source-duplicate1",
+			},
+			{
+				Labels: map[string]string{
+					"component": "duplicate",
+					"type":      "projects",
+				},
+				Name: "odo-project-source-duplicate2",
 			},
 		},
 	}, nil

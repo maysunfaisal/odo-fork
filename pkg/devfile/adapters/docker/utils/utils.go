@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	supervisordVolume = "supervisord"
-	projectsVolume    = "projects"
-	volume            = "vol"
+	supervisordVolume       = "supervisord"
+	projectsVolume          = "projects"
+	volume                  = "vol"
+	projectSourceVolumeName = "odo-project-source"
 )
 
 // ComponentExists checks if Docker containers labeled with the specified component name exists
@@ -254,7 +255,7 @@ func CreateAndGetProjectVolume(client lclient.Client, componentName string) (str
 
 	if len(projectVols) == 0 {
 		// A source volume needs to be created
-		projectVolumeName, err = storage.GenerateVolName("odo-project-source", componentName)
+		projectVolumeName, err = storage.GenerateVolName(projectSourceVolumeName, componentName)
 		if err != nil {
 			return "", errors.Wrapf(err, "unable to generate project source volume name for component %s", componentName)
 		}
