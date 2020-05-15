@@ -12,6 +12,7 @@ import (
 
 	adaptersCommon "github.com/openshift/odo/pkg/devfile/adapters/common"
 	"github.com/openshift/odo/pkg/devfile/adapters/docker/storage"
+	"github.com/openshift/odo/pkg/devfile/parser/data"
 	"github.com/openshift/odo/pkg/devfile/parser/data/common"
 	"github.com/openshift/odo/pkg/lclient"
 	"github.com/openshift/odo/pkg/log"
@@ -24,19 +25,28 @@ import (
 const (
 	supervisordVolume       = "supervisord"
 	projectsVolume          = "projects"
-	volume                  = "vol"
 	projectSourceVolumeName = "odo-project-source"
 )
 
 // ComponentExists checks if Docker containers labeled with the specified component name exists
-func ComponentExists(client lclient.Client, name string) bool {
+func ComponentExists(client lclient.Client, data data.DevfileData, name string) (bool, error) {
 	containers, err := GetComponentContainers(client, name)
 	if err != nil {
-		// log the error since this function basically returns a bool
-		log.Error(err)
-		return false
+		return false, errors.Wrapf(err, "unable to get the containers for component %s", name)
 	}
-	return len(containers) != 0
+
+	supportedComponents := adaptersCommon.GetSupportedComponents(data)
+
+	var componentExists bool
+	if len(containers) == 0 {
+		componentExists = false
+	} else if len(containers) == len(supportedComponents) {
+		componentExists = true
+	} else if len(containers) > 0 && len(containers) != len(supportedComponents) {
+		return false, errors.New(fmt.Sprintf("component %s is in an invalid state, please execute odo delete and retry odo push", name))
+	}
+
+	return componentExists, nil
 }
 
 // GetComponentContainers returns a list of the running component containers
@@ -163,14 +173,15 @@ func GetContainerLabels(componentName, alias string) map[string]string {
 }
 
 // GetSupervisordVolumeLabels returns the label selectors used to retrieve the supervisord volume
-func GetSupervisordVolumeLabels() map[string]string {
+func GetSupervisordVolumeLabels(componentName string) map[string]string {
 	image := adaptersCommon.GetBootstrapperImage()
-	_, _, _, imageTag := util.ParseComponentImageName(image)
+	_, imageWithoutTag, _, imageTag := util.ParseComponentImageName(image)
 
 	supervisordLabels := map[string]string{
-		"name":    adaptersCommon.SupervisordVolumeName,
-		"type":    supervisordVolume,
-		"version": imageTag,
+		"component": componentName,
+		"type":      supervisordVolume,
+		"image":     imageWithoutTag,
+		"version":   imageTag,
 	}
 	return supervisordLabels
 }
@@ -241,9 +252,9 @@ func UpdateComponentWithSupervisord(comp *common.DevfileComponent, runCommand co
 	}
 }
 
-// CreateAndGetProjectVolume creates a project volume if absent and returns the
+// CreateProjectVolumeIfReqd creates a project volume if absent and returns the
 // name of the created project volume
-func CreateAndGetProjectVolume(client lclient.Client, componentName string) (string, error) {
+func CreateProjectVolumeIfReqd(client lclient.Client, componentName string) (string, error) {
 	var projectVolumeName string
 
 	// Get the project source volume
@@ -272,25 +283,23 @@ func CreateAndGetProjectVolume(client lclient.Client, componentName string) (str
 	return projectVolumeName, nil
 }
 
-// CreateAndInitSupervisordVolume creates the supervisord volume and initializes
+// CreateAndInitSupervisordVolumeIfReqd creates the supervisord volume and initializes
 // it with supervisord bootstrap image - assembly files and supervisord binary
-func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
-	log.Info("\nInitialization")
-	s := log.Spinner("Initializing the component")
-	defer s.End(false)
+// returns the name of the supervisord volume and an error if present
+func CreateAndInitSupervisordVolumeIfReqd(client lclient.Client, componentName string, componentExists bool) (string, error) {
+	var supervisordVolumeName string
 
-	supervisordVolumeName, err := storage.GenerateVolName(adaptersCommon.SupervisordVolumeName, volume)
-	if err != nil {
-		return "", errors.Wrapf(err, "unable to generate volume name for supervisord")
-	}
-
-	supervisordLabels := GetSupervisordVolumeLabels()
+	supervisordLabels := GetSupervisordVolumeLabels(componentName)
 	supervisordVolumes, err := client.GetVolumesByLabel(supervisordLabels)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to retrieve supervisord volume for component")
 	}
 
 	if len(supervisordVolumes) == 0 {
+		supervisordVolumeName, err = storage.GenerateVolName(adaptersCommon.SupervisordVolumeName, componentName)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to generate volume name for supervisord")
+		}
 		_, err := client.CreateVolume(supervisordVolumeName, supervisordLabels)
 		if err != nil {
 			return "", errors.Wrapf(err, "unable to create supervisord volume for component")
@@ -299,19 +308,26 @@ func CreateAndInitSupervisordVolume(client lclient.Client) (string, error) {
 		supervisordVolumeName = supervisordVolumes[0].Name
 	}
 
-	err = StartBootstrapSupervisordInitContainer(client, supervisordVolumeName)
-	if err != nil {
-		return "", errors.Wrapf(err, "unable to start supervisord container for component")
+	if !componentExists {
+		log.Info("\nInitialization")
+		s := log.Spinner("Initializing the component")
+		defer s.End(false)
+
+		err = StartBootstrapSupervisordInitContainer(client, componentName, supervisordVolumeName)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to start supervisord container for component")
+		}
+
+		s.End(true)
 	}
-	s.End(true)
 
 	return supervisordVolumeName, nil
 }
 
 // StartBootstrapSupervisordInitContainer pulls the supervisord bootstrap image, mounts the supervisord
 // volume, starts the bootstrap container and initializes the supervisord volume via its entrypoint
-func StartBootstrapSupervisordInitContainer(client lclient.Client, supervisordVolumeName string) error {
-	supervisordLabels := GetSupervisordVolumeLabels()
+func StartBootstrapSupervisordInitContainer(client lclient.Client, componentName, supervisordVolumeName string) error {
+	supervisordLabels := GetSupervisordVolumeLabels(componentName)
 
 	image := adaptersCommon.GetBootstrapperImage()
 	command := []string{"/usr/bin/cp"}

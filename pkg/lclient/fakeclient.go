@@ -79,7 +79,12 @@ var mockContainerList = []types.Container{
 		ID:    "3",
 		Labels: map[string]string{
 			"component": "golang",
-			"8080":      "testurl3",
+			"alias":     "alias1",
+		},
+		Mounts: []types.MountPoint{
+			{
+				Destination: OdoSourceVolumeMount,
+			},
 		},
 		HostConfig: container.HostConfig{
 			PortBindings: nat.PortMap{

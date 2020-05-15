@@ -200,7 +200,7 @@ func TestGetContainersList(t *testing.T) {
 					Image: "golang",
 					Labels: map[string]string{
 						"component": "golang",
-						"8080":      "testurl3",
+						"alias":     "alias1",
 					},
 					HostConfig: container.HostConfig{
 						PortBindings: nat.PortMap{
@@ -210,6 +210,11 @@ func TestGetContainersList(t *testing.T) {
 									HostPort: "65432",
 								},
 							},
+						},
+					},
+					Mounts: []types.MountPoint{
+						{
+							Destination: OdoSourceVolumeMount,
 						},
 					},
 				},

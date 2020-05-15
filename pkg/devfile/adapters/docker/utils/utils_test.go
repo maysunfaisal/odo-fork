@@ -27,32 +27,63 @@ func TestComponentExists(t *testing.T) {
 		name          string
 		componentName string
 		client        *lclient.Client
+		componentType common.DevfileComponentType
 		want          bool
+		wantErr       bool
 	}{
 		{
 			name:          "Case 1: Component exists",
 			componentName: "golang",
 			client:        fakeClient,
+			componentType: common.DevfileComponentTypeDockerimage,
 			want:          true,
+			wantErr:       false,
 		},
 		{
 			name:          "Case 2: Component doesn't exist",
 			componentName: "fakecomponent",
 			client:        fakeClient,
+			componentType: common.DevfileComponentTypeDockerimage,
 			want:          false,
+			wantErr:       false,
 		},
 		{
 			name:          "Case 3: Error with docker client",
 			componentName: "golang",
 			client:        fakeErrorClient,
+			componentType: common.DevfileComponentTypeDockerimage,
 			want:          false,
+			wantErr:       true,
+		},
+		{
+			name:          "Case 4: Container and devfile component mismatch",
+			componentName: "test",
+			client:        fakeClient,
+			componentType: common.DevfileComponentTypeDockerimage,
+			want:          false,
+			wantErr:       true,
+		},
+		{
+			name:          "Case 5: Devfile does not have supported components",
+			componentName: "golang",
+			client:        fakeClient,
+			componentType: common.DevfileComponentTypeCheEditor,
+			want:          false,
+			wantErr:       true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmpExists := ComponentExists(*tt.client, tt.componentName)
-			if tt.want != cmpExists {
+			devObj := devfileParser.DevfileObj{
+				Data: testingutil.TestDevfileData{
+					ComponentType: tt.componentType,
+				},
+			}
+			cmpExists, err := ComponentExists(*tt.client, devObj.Data, tt.componentName)
+			if !tt.wantErr && err != nil {
+				t.Errorf("TestComponentExists error, unexpected error - %v", err)
+			} else if !tt.wantErr && tt.want != cmpExists {
 				t.Errorf("expected %v, wanted %v", cmpExists, tt.want)
 			}
 		})
@@ -629,25 +660,30 @@ func TestGetContainerLabels(t *testing.T) {
 
 func TestGetSupervisordVolumeLabels(t *testing.T) {
 
+	componentNameArr := []string{"myComponent1", "myComponent2"}
+
 	tests := []struct {
-		name        string
-		customImage bool
-		want        map[string]string
+		name          string
+		componentName string
+		customImage   bool
+		want          map[string]string
 	}{
 		{
-			name:        "Case 1: Default supervisord image",
-			customImage: false,
+			name:          "Case 1: Default supervisord image",
+			componentName: componentNameArr[0],
+			customImage:   false,
 			want: map[string]string{
-				"name": adaptersCommon.SupervisordVolumeName,
-				"type": supervisordVolume,
+				"component": componentNameArr[0],
+				"type":      supervisordVolume,
 			},
 		},
 		{
-			name:        "Case 2: Custom supervisord image",
-			customImage: true,
+			name:          "Case 2: Custom supervisord image",
+			componentName: componentNameArr[1],
+			customImage:   true,
 			want: map[string]string{
-				"name": adaptersCommon.SupervisordVolumeName,
-				"type": supervisordVolume,
+				"component": componentNameArr[1],
+				"type":      supervisordVolume,
 			},
 		},
 	}
@@ -657,11 +693,12 @@ func TestGetSupervisordVolumeLabels(t *testing.T) {
 				os.Setenv("ODO_BOOTSTRAPPER_IMAGE", "customimage:customtag")
 			}
 			image := adaptersCommon.GetBootstrapperImage()
-			_, _, _, imageTag := util.ParseComponentImageName(image)
+			_, imageWithoutTag, _, imageTag := util.ParseComponentImageName(image)
 
 			tt.want["version"] = imageTag
+			tt.want["image"] = imageWithoutTag
 
-			labels := GetSupervisordVolumeLabels()
+			labels := GetSupervisordVolumeLabels(tt.componentName)
 			if !reflect.DeepEqual(tt.want, labels) {
 				t.Errorf("expected %v, actual %v", tt.want, labels)
 			}
@@ -1031,6 +1068,7 @@ func TestUpdateComponentWithSupervisord(t *testing.T) {
 func TestStartBootstrapSupervisordInitContainer(t *testing.T) {
 
 	supervisordVolumeName := supervisordVolume
+	componentName := "myComponent"
 
 	fakeClient := lclient.FakeNew()
 	fakeErrorClient := lclient.FakeErrorNew()
@@ -1053,7 +1091,7 @@ func TestStartBootstrapSupervisordInitContainer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := StartBootstrapSupervisordInitContainer(*tt.client, supervisordVolumeName)
+			err := StartBootstrapSupervisordInitContainer(*tt.client, componentName, supervisordVolumeName)
 			if !tt.wantErr && err != nil {
 				t.Errorf("TestStartBootstrapSupervisordInitContainer: unexpected error got: %v wanted: %v", err, tt.wantErr)
 			}
@@ -1062,10 +1100,12 @@ func TestStartBootstrapSupervisordInitContainer(t *testing.T) {
 
 }
 
-func TestCreateAndInitSupervisordVolume(t *testing.T) {
+func TestCreateAndInitSupervisordVolumeIfReqd(t *testing.T) {
 
 	fakeClient := lclient.FakeNew()
 	fakeErrorClient := lclient.FakeErrorNew()
+
+	componentName := "myComponent"
 
 	tests := []struct {
 		name    string
@@ -1085,11 +1125,11 @@ func TestCreateAndInitSupervisordVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			volName, err := CreateAndInitSupervisordVolume(*tt.client)
+			volName, err := CreateAndInitSupervisordVolumeIfReqd(*tt.client, componentName, false)
 			if !tt.wantErr && err != nil {
-				t.Logf("TestCreateAndInitSupervisordVolume: unexpected error %v, wanted %v", err, tt.wantErr)
-			} else if !tt.wantErr && volName != adaptersCommon.SupervisordVolumeName {
-				t.Logf("TestCreateAndInitSupervisordVolume: unexpected supervisord vol name, expected: %v got: %v", adaptersCommon.SupervisordVolumeName, volName)
+				t.Errorf("TestCreateAndInitSupervisordVolume: unexpected error %v, wanted %v", err, tt.wantErr)
+			} else if !tt.wantErr && !strings.Contains(volName, adaptersCommon.SupervisordVolumeName+"-"+componentName) {
+				t.Errorf("TestCreateAndInitSupervisordVolume: unexpected supervisord vol name, expected: %v got: %v", adaptersCommon.SupervisordVolumeName, volName)
 			}
 		})
 	}
@@ -1140,7 +1180,7 @@ func TestGetContainerIDForAlias(t *testing.T) {
 
 }
 
-func TestCreateAndGetProjectVolume(t *testing.T) {
+func TestCreateProjectVolumeIfReqd(t *testing.T) {
 	fakeClient := lclient.FakeNew()
 	fakeErrorClient := lclient.FakeErrorNew()
 
@@ -1183,7 +1223,7 @@ func TestCreateAndGetProjectVolume(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			volumeName, err := CreateAndGetProjectVolume(*tt.client, tt.componentName)
+			volumeName, err := CreateProjectVolumeIfReqd(*tt.client, tt.componentName)
 			if !tt.wantErr && err != nil {
 				t.Errorf("TestCreateAndGetProjectVolume error: Unexpected error: %v", err)
 			} else if !tt.wantErr && !strings.Contains(volumeName, tt.wantVolumeName) {
