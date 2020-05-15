@@ -201,6 +201,7 @@ func TestGetContainersList(t *testing.T) {
 					Labels: map[string]string{
 						"component": "golang",
 						"alias":     "alias1",
+						"8080":      "testurl3",
 					},
 					HostConfig: container.HostConfig{
 						PortBindings: nat.PortMap{
