@@ -44,7 +44,7 @@ type Adapter struct {
 func (a Adapter) Push(parameters common.PushParameters) (err error) {
 	componentExists, err := utils.ComponentExists(a.Client, a.Devfile.Data, a.ComponentName)
 	if err != nil {
-		return errors.Wrapf(err, "unable to determine if component exists for component %s", a.ComponentName)
+		return errors.Wrapf(err, "unable to determine if component %s exists", a.ComponentName)
 	}
 
 	// Process the volumes defined in the devfile
@@ -66,12 +66,12 @@ func (a Adapter) Push(parameters common.PushParameters) (err error) {
 	}
 	s.End(true)
 
-	a.supervisordVolumeName, err = utils.CreateAndInitSupervisordVolumeIfReqd(a.Client, a.ComponentName, componentExists)
+	a.supervisordVolumeName, err = a.createAndInitSupervisordVolumeIfReqd(componentExists)
 	if err != nil {
 		return errors.Wrapf(err, "unable to create supervisord volume for component %s", a.ComponentName)
 	}
 
-	a.projectVolumeName, err = utils.CreateProjectVolumeIfReqd(a.Client, a.ComponentName)
+	a.projectVolumeName, err = a.createProjectVolumeIfReqd()
 	if err != nil {
 		return errors.Wrapf(err, "unable to determine the project source volume for component %s", a.ComponentName)
 	}
@@ -197,9 +197,9 @@ func (a Adapter) Delete(labels map[string]string) error {
 
 			if snVal := vol.Labels["storage-name"]; len(strings.TrimSpace(snVal)) > 0 {
 				vols = append(vols, vol)
-			} else if typeVal := vol.Labels["type"]; typeVal == "projects" {
+			} else if typeVal := vol.Labels["type"]; typeVal == utils.ProjectsVolume {
 				vols = append(vols, vol)
-			} else if typeVal := vol.Labels["type"]; typeVal == "supervisord" {
+			} else if typeVal := vol.Labels["type"]; typeVal == utils.SupervisordVolume {
 				vols = append(vols, vol)
 			}
 		}

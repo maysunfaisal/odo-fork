@@ -420,3 +420,42 @@ func TestExecCMDInContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestWaitForContainer(t *testing.T) {
+	fakeClient := FakeNew()
+	fakeErrorClient := FakeErrorNew()
+
+	tests := []struct {
+		name      string
+		client    *Client
+		condition container.WaitCondition
+		wantErr   bool
+	}{
+		{
+			name:      "Case 1: Successfully wait for a condition",
+			client:    fakeClient,
+			condition: container.WaitConditionNotRunning,
+			wantErr:   false,
+		},
+		{
+			name:      "Case 2: Failed to wait for a condition with error channel",
+			client:    fakeErrorClient,
+			condition: container.WaitConditionNotRunning,
+			wantErr:   true,
+		},
+		{
+			name:      "Case 3: Failed to wait for a condition with bad exit code",
+			client:    fakeErrorClient,
+			condition: container.WaitConditionNextExit,
+			wantErr:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.client.WaitForContainer("id", tt.condition)
+			if !tt.wantErr == (err != nil) {
+				t.Errorf("got: %v, wanted: %v", err, tt.wantErr)
+			}
+		})
+	}
+}

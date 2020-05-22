@@ -3,6 +3,7 @@ package lclient
 import (
 	"io"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -149,4 +150,23 @@ func (dc *Client) ExtractProjectToComponent(compInfo common.ComponentInfo, targe
 		return err
 	}
 	return nil
+}
+
+// WaitForContainer waits for the container until the condition is reached
+func (dc *Client) WaitForContainer(containerID string, condition container.WaitCondition) error {
+
+	containerWaitCh, errCh := dc.Client.ContainerWait(dc.Context, containerID, condition)
+	for {
+		select {
+		case containerWait := <-containerWaitCh:
+			if containerWait.StatusCode != 0 {
+				return errors.Errorf("error waiting on container %s until condition %s; status code: %v, error message: %v", containerID, string(condition), containerWait.StatusCode, containerWait.Error.Message)
+			}
+			return nil
+		case err := <-errCh:
+			return errors.Wrapf(err, "unable to wait on container %s until condition %s", containerID, string(condition))
+		case <-time.After(2 * time.Minute):
+			return errors.Errorf("timeout while waiting for container %s to reach condition %s", containerID, string(condition))
+		}
+	}
 }
