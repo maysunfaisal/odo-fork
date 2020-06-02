@@ -31,6 +31,15 @@ func ValidateDevfileData(data interface{}) error {
 		return err
 	}
 
+	// // Validate Commands
+	// if typeData == reflect.TypeOf(&v200.Devfile200{}) {
+	// 	d := data.(*v200.Devfile200)
+	// 	commands := d.GetCommands()
+	// 	if err := ValidateCommands(commands); err != nil {
+	// 		return err
+	// 	}
+	// }
+
 	// Successful
 	klog.V(4).Info("Successfully validated devfile sections")
 	return nil

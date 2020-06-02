@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openshift/odo/pkg/devfile"
 	"github.com/openshift/odo/pkg/envinfo"
 	"github.com/openshift/odo/pkg/odo/genericclioptions"
 	"github.com/openshift/odo/pkg/odo/util/pushtarget"
@@ -14,7 +15,6 @@ import (
 	"github.com/openshift/odo/pkg/devfile/adapters"
 	"github.com/openshift/odo/pkg/devfile/adapters/common"
 	"github.com/openshift/odo/pkg/devfile/adapters/kubernetes"
-	devfileParser "github.com/openshift/odo/pkg/devfile/parser"
 	"github.com/openshift/odo/pkg/log"
 )
 
@@ -35,7 +35,7 @@ feature progresses.
 // DevfilePush has the logic to perform the required actions for a given devfile
 func (po *PushOptions) DevfilePush() (err error) {
 	// Parse devfile
-	devObj, err := devfileParser.Parse(po.DevfilePath)
+	devObj, err := devfile.ParseAndValidate(po.DevfilePath)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func getComponentName(context string) (string, error) {
 // DevfileComponentDelete deletes the devfile component
 func (do *DeleteOptions) DevfileComponentDelete() error {
 	// Parse devfile
-	devObj, err := devfileParser.Parse(do.devfilePath)
+	devObj, err := devfile.ParseAndValidate(do.devfilePath)
 	if err != nil {
 		return err
 	}
