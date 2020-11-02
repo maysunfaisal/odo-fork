@@ -353,6 +353,7 @@ func (a Adapter) createOrUpdateComponent(componentExists bool, ei envinfo.EnvSpe
 	}
 
 	odoMandatoryVolumes := utils.GetOdoContainerVolumes()
+	utils.AddOdoProjectVolume(&containers)
 
 	podTemplateSpecParams := generator.PodTemplateSpecParams{
 		ObjectMeta:     objectMeta,
