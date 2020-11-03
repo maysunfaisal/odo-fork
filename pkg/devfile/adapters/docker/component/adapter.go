@@ -89,7 +89,7 @@ func (a Adapter) Push(parameters common.PushParameters) (err error) {
 	}
 
 	// Process the volumes defined in the devfile
-	a.containerNameToVolumes = common.GetVolumes(a.Devfile)
+	// a.containerNameToVolumes = common.GetVolumes(a.Devfile)
 	a.uniqueStorage, a.volumeNameToDockerVolName, err = storage.ProcessVolumes(&a.Client, a.ComponentName, a.containerNameToVolumes)
 	if err != nil {
 		return errors.Wrapf(err, "unable to process volumes for component %s", a.ComponentName)

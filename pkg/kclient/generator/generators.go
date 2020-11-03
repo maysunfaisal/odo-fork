@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1 "k8s.io/api/extensions/v1beta1"
@@ -17,6 +18,7 @@ import (
 
 	devfileParser "github.com/openshift/odo/pkg/devfile/parser"
 	versionsCommon "github.com/openshift/odo/pkg/devfile/parser/data/common"
+	"github.com/openshift/odo/pkg/util"
 )
 
 const (
@@ -31,6 +33,11 @@ const (
 
 	deploymentKind       = "Deployment"
 	deploymentAPIVersion = "apps/v1"
+
+	pvcNameMaxLen = 45
+
+	// defaultVolumeSize Default volume size for volumes defined in a devfile
+	defaultVolumeSize = "1Gi"
 )
 
 // CreateObjectMeta creates a common object meta
@@ -99,6 +106,13 @@ func GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, err
 		}
 		container := generateContainer(containerParams)
 
+		for _, volMount := range comp.Container.VolumeMounts {
+			if volMount.Path == "" {
+				volMount.Path = "/" + volMount.Name
+			}
+			addVolumeMountToContainer(container, volMount.Name, volMount.Path)
+		}
+
 		// If `mountSources: true` was set, add an empty dir volume to the container to sync the source to
 		// Sync to `Container.SourceMapping` and/or devfile projects if set
 		if comp.Container.MountSources {
@@ -112,6 +126,16 @@ func GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, err
 		containers = append(containers, *container)
 	}
 	return containers, nil
+}
+
+// addVolumeMountToContainer adds the volume mount for the given volume name and mount path to the container
+func addVolumeMountToContainer(container *corev1.Container, volumeName, mountPath string) {
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPath,
+		SubPath:   "",
+	})
 }
 
 // PodTemplateSpecParams is a struct that contains the required data to create a pod template spec object
@@ -155,23 +179,6 @@ func GenerateDeploymentSpec(deployParams DeploymentSpecParams) *appsv1.Deploymen
 	}
 
 	return deploymentSpec
-}
-
-// GeneratePVCSpec creates a pvc spec
-func GeneratePVCSpec(quantity resource.Quantity) *corev1.PersistentVolumeClaimSpec {
-
-	pvcSpec := &corev1.PersistentVolumeClaimSpec{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: quantity,
-			},
-		},
-		AccessModes: []corev1.PersistentVolumeAccessMode{
-			corev1.ReadWriteOnce,
-		},
-	}
-
-	return pvcSpec
 }
 
 // ServiceSpecParams is a struct that contains the required data to create a svc spec object
@@ -341,4 +348,71 @@ func GenerateOwnerReference(deployment *appsv1.Deployment) metav1.OwnerReference
 	}
 
 	return ownerReference
+}
+
+// GeneratePVCSpec creates a pvc spec
+func GeneratePVCSpec(quantity resource.Quantity) *corev1.PersistentVolumeClaimSpec {
+
+	pvcSpec := &corev1.PersistentVolumeClaimSpec{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: quantity,
+			},
+		},
+		AccessModes: []corev1.PersistentVolumeAccessMode{
+			corev1.ReadWriteOnce,
+		},
+	}
+
+	return pvcSpec
+}
+
+// GetVolumes returns a slice of Kubernetes volumes corresponding to the devfile volume components.
+// The PVC claim name is not initiated and is left upto the consumer of the method
+func GetVolumes(devfileObj devfileParser.DevfileObj) (map[corev1.Volume]*corev1.PersistentVolumeClaimSpec, error) {
+	volumeMap := make(map[corev1.Volume]*corev1.PersistentVolumeClaimSpec)
+	for _, comp := range GetDevfileVolumeComponents(devfileObj.Data) {
+
+		// Generate the Kubernetes Volume
+		pvcName, err := generatePVCName(comp.Name)
+		if err != nil {
+			return nil, err
+		}
+		volume := corev1.Volume{
+			Name: comp.Name,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		}
+
+		// Generate the PVC spec for the corresponding volume
+		size := defaultVolumeSize
+		if len(comp.Volume.Size) > 0 {
+			size = comp.Volume.Size
+		}
+		quantity, err := resource.ParseQuantity(size)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to parse size %s for volume component %s", comp.Volume.Size, comp.Name)
+		}
+		pvcSpec := GeneratePVCSpec(quantity)
+
+		volumeMap[volume] = pvcSpec
+	}
+
+	return volumeMap, nil
+}
+
+// generatePVCName generates a PVC name based on the volume component name
+func generatePVCName(volComp string) (string, error) {
+
+	pvcName := util.TruncateString(volComp, pvcNameMaxLen)
+	randomChars := util.GenerateRandomString(4)
+	pvcName, err := util.NamespaceOpenShiftObject(pvcName, randomChars)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to create namespaced name")
+	}
+
+	return pvcName, nil
 }

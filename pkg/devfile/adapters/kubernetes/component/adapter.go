@@ -283,6 +283,8 @@ func (a Adapter) createOrUpdateComponent(componentExists bool, ei envinfo.EnvSpe
 		return fmt.Errorf("No valid components found in the devfile")
 	}
 
+	utils.AddOdoProjectVolume(&containers)
+
 	containers, err = utils.UpdateContainersWithSupervisord(a.Devfile, containers, a.devfileRunCmd, a.devfileDebugCmd, a.devfileDebugPort)
 	if err != nil {
 		return err
@@ -299,61 +301,28 @@ func (a Adapter) createOrUpdateComponent(componentExists bool, ei envinfo.EnvSpe
 	initContainers := utils.GetPreStartInitContainers(a.Devfile, containers)
 	initContainers = append(initContainers, supervisordInitContainer)
 
-	containerNameToVolumes := common.GetVolumes(a.Devfile)
-
-	var uniqueStorages []common.Storage
-	volumeNameToPVCName := make(map[string]string)
-	processedVolumes := make(map[string]bool)
-
-	// Get a list of all the unique volume names and generate their PVC names
-	// we do not use the volume components which are unique here because
-	// not all volume components maybe referenced by a container component.
-	// We only want to create PVCs which are going to be used by a container
-	for _, volumes := range containerNameToVolumes {
-		for _, vol := range volumes {
-			if _, ok := processedVolumes[vol.Name]; !ok {
-				processedVolumes[vol.Name] = true
-
-				// Generate the PVC Names
-				klog.V(2).Infof("Generating PVC name for %v", vol.Name)
-				generatedPVCName, err := storage.GeneratePVCNameFromDevfileVol(vol.Name, componentName)
-				if err != nil {
-					return err
-				}
-
-				// Check if we have an existing PVC with the labels, overwrite the generated name with the existing name if present
-				existingPVCName, err := storage.GetExistingPVC(&a.Client, vol.Name, componentName)
-				if err != nil {
-					return err
-				}
-				if len(existingPVCName) > 0 {
-					klog.V(2).Infof("Found an existing PVC for %v, PVC %v will be re-used", vol.Name, existingPVCName)
-					generatedPVCName = existingPVCName
-				}
-
-				pvc := common.Storage{
-					Name:   generatedPVCName,
-					Volume: vol,
-				}
-				uniqueStorages = append(uniqueStorages, pvc)
-				volumeNameToPVCName[vol.Name] = generatedPVCName
-			}
-		}
-	}
+	processedVolumes := common.GetUsedDevfileVolumes(a.Devfile)
 
 	err = storage.DeleteOldPVCs(&a.Client, componentName, processedVolumes)
 	if err != nil {
 		return err
 	}
 
-	// Get PVC volumes and Volume Mounts
-	containers, pvcVolumes, err := kclient.GetPVCVolAndVolMount(containers, volumeNameToPVCName, containerNameToVolumes)
+	var pvcVolumes []corev1.Volume
+	volumeMap, err := generator.GetVolumes(a.Devfile)
 	if err != nil {
 		return err
 	}
+	for volume := range volumeMap {
+		// only keep the volumes that is going to be used by the container components in the devfile
+		if _, ok := processedVolumes[volume.Name]; ok {
+			pvcVolumes = append(pvcVolumes, volume)
+		} else {
+			delete(volumeMap, volume)
+		}
+	}
 
 	odoMandatoryVolumes := utils.GetOdoContainerVolumes()
-	utils.AddOdoProjectVolume(&containers)
 
 	podTemplateSpecParams := generator.PodTemplateSpecParams{
 		ObjectMeta:     objectMeta,
@@ -439,7 +408,7 @@ func (a Adapter) createOrUpdateComponent(componentExists bool, ei envinfo.EnvSpe
 
 	// Get the storage adapter and create the volumes if it does not exist
 	stoAdapter := storage.New(a.AdapterContext, a.Client)
-	err = stoAdapter.Create(uniqueStorages)
+	err = stoAdapter.Create(volumeMap)
 	if err != nil {
 		return err
 	}

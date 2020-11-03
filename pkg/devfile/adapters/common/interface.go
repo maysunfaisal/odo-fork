@@ -2,6 +2,8 @@ package common
 
 import (
 	"io"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ComponentAdapter defines the functions that platform-specific adapters must implement
@@ -19,5 +21,5 @@ type ComponentAdapter interface {
 
 // StorageAdapter defines the storage functions that platform-specific adapters must implement
 type StorageAdapter interface {
-	Create([]Storage) error
+	Create(map[corev1.Volume]*corev1.PersistentVolumeClaimSpec) error
 }

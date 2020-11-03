@@ -29,6 +29,9 @@ func GetOdoContainerVolumes() []corev1.Volume {
 	return []corev1.Volume{
 		{
 			Name: OdoSourceVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
 		},
 		{
 			// Create a volume that will be shared betwen InitContainer and the applicationContainer

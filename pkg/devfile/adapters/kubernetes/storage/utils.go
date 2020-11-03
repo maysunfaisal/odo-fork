@@ -8,34 +8,28 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 
-	"github.com/openshift/odo/pkg/devfile/adapters/common"
 	"github.com/openshift/odo/pkg/kclient"
 	"github.com/openshift/odo/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const pvcNameMaxLen = 45
 
 // CreateComponentStorage creates PVCs with the given list of storages if it does not exist, else it uses the existing PVC
-func CreateComponentStorage(Client *kclient.Client, storages []common.Storage, componentName string) (err error) {
+func CreateComponentStorage(Client *kclient.Client, volumeMap map[corev1.Volume]*corev1.PersistentVolumeClaimSpec, componentName string) (err error) {
 
-	for _, storage := range storages {
-		volumeName := storage.Volume.Name
-		volumeSize := storage.Volume.Size
-		pvcName := storage.Name
-
-		existingPVCName, err := GetExistingPVC(Client, volumeName, componentName)
+	for volume, pvcSpec := range volumeMap {
+		existingPVCName, err := GetExistingPVC(Client, volume.Name, componentName)
 		if err != nil {
 			return err
 		}
 
 		if len(existingPVCName) == 0 {
-			klog.V(2).Infof("Creating a PVC for %v", volumeName)
-			_, err := Create(Client, volumeName, volumeSize, componentName, pvcName)
+			klog.V(2).Infof("Creating a PVC for %v", volume.Name)
+			_, err := Create(Client, volume.Name, componentName, volume.PersistentVolumeClaim.ClaimName, pvcSpec)
 			if err != nil {
-				return errors.Wrapf(err, "Error creating PVC for "+volumeName)
+				return errors.Wrapf(err, "Error creating PVC for "+volume.Name)
 			}
 		}
 	}
@@ -44,20 +38,14 @@ func CreateComponentStorage(Client *kclient.Client, storages []common.Storage, c
 }
 
 // Create creates the pvc for the given pvc name, volume name, volume size and component name
-func Create(Client *kclient.Client, name, size, componentName, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+func Create(Client *kclient.Client, name, componentName, pvcName string, pvcSpec *corev1.PersistentVolumeClaimSpec) (*corev1.PersistentVolumeClaim, error) {
 
 	labels := map[string]string{
 		"component":                componentName,
 		labels.DevfileStorageLabel: name,
 	}
 
-	quantity, err := resource.ParseQuantity(size)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to parse size: %v", size)
-	}
-
 	objectMeta := generator.CreateObjectMeta(pvcName, Client.Namespace, labels, nil)
-	pvcSpec := generator.GeneratePVCSpec(quantity)
 
 	// Get the deployment
 	deployment, err := Client.GetDeploymentByName(componentName)

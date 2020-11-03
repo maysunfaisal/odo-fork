@@ -582,6 +582,7 @@ func DevfileListMounted(kClient *kclient.Client, componentName string) (StorageL
 
 	var storage []Storage
 	var volumeMounts []Storage
+	processedVolumeMounts := make(map[string]bool)
 	for _, container := range pod.Spec.Containers {
 		for _, volumeMount := range container.VolumeMounts {
 			volumeMounts = append(volumeMounts, Storage{
@@ -591,11 +592,23 @@ func DevfileListMounted(kClient *kclient.Client, componentName string) (StorageL
 					ContainerName: container.Name,
 				},
 			})
+
+			if _, ok := processedVolumeMounts[volumeMount.Name]; !ok {
+				processedVolumeMounts[volumeMount.Name] = true
+			}
 		}
 	}
 
 	if len(volumeMounts) <= 0 {
 		return StorageList{}, nil
+	}
+
+	volumePVCMap := make(map[string]string)
+	for _, volume := range pod.Spec.Volumes {
+		// only check for PVC type volumes since devfile volumes are PVCs
+		if _, ok := processedVolumeMounts[volume.Name]; ok && volume.PersistentVolumeClaim != nil {
+			volumePVCMap[volume.Name] = volume.PersistentVolumeClaim.ClaimName
+		}
 	}
 
 	label := fmt.Sprintf("component=%s", componentName)
@@ -607,7 +620,8 @@ func DevfileListMounted(kClient *kclient.Client, componentName string) (StorageL
 	for _, pvc := range pvcs {
 		found := false
 		for _, volumeMount := range volumeMounts {
-			if volumeMount.Name == pvc.Name+"-vol" {
+			pvcName := volumePVCMap[volumeMount.Name]
+			if pvcName == pvc.Name {
 				found = true
 				size := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 				storage = append(storage, GetMachineFormatWithContainer(pvc.Labels[storagelabels.DevfileStorageLabel], size.String(), volumeMount.Spec.Path, volumeMount.Spec.ContainerName))
