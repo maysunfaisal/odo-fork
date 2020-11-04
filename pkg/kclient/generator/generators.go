@@ -81,7 +81,7 @@ func generateContainer(containerParams ContainerParams) *corev1.Container {
 }
 
 // GetContainers iterates through the components in the devfile and returns a slice of the corresponding containers
-func GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, error) {
+func (g *GeneratorData) GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, error) {
 	var containers []corev1.Container
 	for _, comp := range GetDevfileContainerComponents(devfileObj.Data) {
 		envVars := convertEnvs(comp.Container.Env)
@@ -207,7 +207,7 @@ func GetService(devfileObj devfileParser.DevfileObj, selectorLabels map[string]s
 	var containerPorts []corev1.ContainerPort
 	containerComponents := GetDevfileContainerComponents(devfileObj.Data)
 	portExposureMap := GetPortExposure(containerComponents)
-	containers, err := GetContainers(devfileObj)
+	containers, err := New().GetContainers(devfileObj)
 	if err != nil {
 		return nil, err
 	}

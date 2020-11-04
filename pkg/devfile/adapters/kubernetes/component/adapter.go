@@ -274,7 +274,8 @@ func (a Adapter) createOrUpdateComponent(componentExists bool, ei envinfo.EnvSpe
 	labels["component"] = componentName
 	labels[componentlabels.ComponentTypeLabel] = componentType
 
-	containers, err := generator.GetContainers(a.Devfile)
+	genImpl := generator.New()
+	containers, err := genImpl.GetContainers(a.Devfile)
 	if err != nil {
 		return err
 	}

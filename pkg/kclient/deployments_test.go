@@ -30,8 +30,8 @@ func createFakeDeployment(fkclient *Client, fkclientset *FakeClientset, podName 
 			},
 		},
 	}
-
-	containers, err := generator.GetContainers(devObj)
+	genImpl := generator.New()
+	containers, err := genImpl.GetContainers(devObj)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,8 @@ func TestUpdateDeployment(t *testing.T) {
 		},
 	}
 
-	containers, err := generator.GetContainers(devObj)
+	genImpl := generator.New()
+	containers, err := genImpl.GetContainers(devObj)
 	if err != nil {
 		t.Errorf("generator.GetContainers unexpected error %v", err)
 	}

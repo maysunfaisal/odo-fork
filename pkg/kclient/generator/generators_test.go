@@ -118,7 +118,7 @@ func TestGetContainers(t *testing.T) {
 				},
 			}
 
-			containers, err := GetContainers(devObj)
+			containers, err := New().GetContainers(devObj)
 			// Unexpected error
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestGetContainers() error = %v, wantErr %v", err, tt.wantErr)
