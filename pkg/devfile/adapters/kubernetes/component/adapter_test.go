@@ -44,6 +44,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 		envInfo       envinfo.EnvSpecificInfo
 		running       bool
 		wantErr       bool
+		generator     generator.Generator
 	}{
 		{
 			name:          "Case 1: Invalid devfile",
@@ -51,6 +52,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 			envInfo:       envinfo.EnvSpecificInfo{},
 			running:       false,
 			wantErr:       true,
+			generator:     testingutil.NewMockErrorGenerator(),
 		},
 		{
 			name:          "Case 2: Valid devfile",
@@ -58,6 +60,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 			envInfo:       envinfo.EnvSpecificInfo{},
 			running:       false,
 			wantErr:       false,
+			generator:     testingutil.NewMockGenerator(),
 		},
 		{
 			name:          "Case 3: Invalid devfile, already running component",
@@ -65,6 +68,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 			envInfo:       envinfo.EnvSpecificInfo{},
 			running:       true,
 			wantErr:       true,
+			generator:     testingutil.NewMockErrorGenerator(),
 		},
 		{
 			name:          "Case 4: Valid devfile, already running component",
@@ -72,6 +76,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 			envInfo:       envinfo.EnvSpecificInfo{},
 			running:       true,
 			wantErr:       false,
+			generator:     testingutil.NewMockGenerator(),
 		},
 	}
 	for _, tt := range tests {
@@ -90,6 +95,7 @@ func TestCreateOrUpdateComponent(t *testing.T) {
 			adapterCtx := adaptersCommon.AdapterContext{
 				ComponentName: testComponentName,
 				Devfile:       devObj,
+				Generator:     tt.generator,
 			}
 
 			fkclient, fkclientset := kclient.FakeNew()

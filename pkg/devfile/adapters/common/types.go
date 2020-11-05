@@ -4,6 +4,7 @@ import (
 	devfileParser "github.com/openshift/odo/pkg/devfile/parser"
 	"github.com/openshift/odo/pkg/devfile/parser/data/common"
 	"github.com/openshift/odo/pkg/envinfo"
+	"github.com/openshift/odo/pkg/kclient/generator"
 )
 
 // AdapterContext is a construct that is common to all adapters
@@ -12,6 +13,7 @@ type AdapterContext struct {
 	Context       string                   // Context is the given directory containing the source code and configs
 	AppName       string                   // the application name associated to a component
 	Devfile       devfileParser.DevfileObj // Devfile is the object returned by the Devfile parser
+	Generator     generator.Generator
 }
 
 // DevfileVolume is a struct for Devfile volume that is common to all the adapters

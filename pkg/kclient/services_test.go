@@ -47,7 +47,7 @@ func TestCreateService(t *testing.T) {
 			fkclient, fkclientset := FakeNew()
 			fkclient.Namespace = "default"
 
-			objectMeta := generator.GetObjectMeta(tt.componentName, "default", nil, nil)
+			objectMeta := generator.New().GetObjectMeta(tt.componentName, "default", nil, nil)
 
 			labels := map[string]string{
 				"component": tt.componentName,
@@ -65,7 +65,7 @@ func TestCreateService(t *testing.T) {
 				return true, &service, nil
 			})
 
-			serviceSpec, err := generator.GetService(devObj, labels)
+			serviceSpec, err := generator.New().GetService(devObj, labels)
 			if err != nil {
 				t.Errorf("generator.GetService unexpected error %v", err)
 			}
@@ -123,7 +123,7 @@ func TestUpdateService(t *testing.T) {
 			fkclient, fkclientset := FakeNew()
 			fkclient.Namespace = "default"
 
-			objectMeta := generator.GetObjectMeta(tt.componentName, "default", nil, nil)
+			objectMeta := generator.New().GetObjectMeta(tt.componentName, "default", nil, nil)
 
 			labels := map[string]string{
 				"component": tt.componentName,
@@ -141,7 +141,7 @@ func TestUpdateService(t *testing.T) {
 				return true, &service, nil
 			})
 
-			serviceSpec, err := generator.GetService(devObj, labels)
+			serviceSpec, err := generator.New().GetService(devObj, labels)
 			if err != nil {
 				t.Errorf("generator.GetService unexpected error %v", err)
 			}

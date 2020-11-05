@@ -31,17 +31,17 @@ func createFakeDeployment(fkclient *Client, fkclientset *FakeClientset, podName 
 		},
 	}
 
-	containers, err := generator.GetContainers(devObj)
+	containers, err := generator.New().GetContainers(devObj)
 	if err != nil {
 		return nil, err
 	}
 
-	objectMeta := generator.GetObjectMeta(podName, "default", labels, nil)
+	objectMeta := generator.New().GetObjectMeta(podName, "default", labels, nil)
 	podTemplateSpecParams := generator.PodTemplateSpecParams{
 		ObjectMeta: objectMeta,
 		Containers: containers,
 	}
-	podTemplateSpec := generator.GetPodTemplateSpec(podTemplateSpecParams)
+	podTemplateSpec := generator.New().GetPodTemplateSpec(podTemplateSpecParams)
 
 	fkclientset.Kubernetes.PrependReactor("create", "deployments", func(action ktesting.Action) (bool, runtime.Object, error) {
 		if podName == "" {
@@ -65,7 +65,7 @@ func createFakeDeployment(fkclient *Client, fkclientset *FakeClientset, podName 
 		PodSelectorLabels: podTemplateSpec.Labels,
 	}
 
-	deploymentSpec := generator.GetDeploymentSpec(deployParams)
+	deploymentSpec := generator.New().GetDeploymentSpec(deployParams)
 	createdDeployment, err := fkclient.CreateDeployment(*deploymentSpec)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func TestUpdateDeployment(t *testing.T) {
 		},
 	}
 
-	containers, err := generator.GetContainers(devObj)
+	containers, err := generator.New().GetContainers(devObj)
 	if err != nil {
 		t.Errorf("generator.GetContainers unexpected error %v", err)
 	}
@@ -222,13 +222,13 @@ func TestUpdateDeployment(t *testing.T) {
 			fkclient, fkclientset := FakeNew()
 			fkclient.Namespace = "default"
 
-			objectMeta := generator.GetObjectMeta(tt.deploymentName, "default", labels, nil)
+			objectMeta := generator.New().GetObjectMeta(tt.deploymentName, "default", labels, nil)
 
 			podTemplateSpecParams := generator.PodTemplateSpecParams{
 				ObjectMeta: objectMeta,
 				Containers: containers,
 			}
-			podTemplateSpec := generator.GetPodTemplateSpec(podTemplateSpecParams)
+			podTemplateSpec := generator.New().GetPodTemplateSpec(podTemplateSpecParams)
 
 			fkclientset.Kubernetes.PrependReactor("update", "deployments", func(action ktesting.Action) (bool, runtime.Object, error) {
 				if tt.deploymentName == "" {
@@ -251,7 +251,7 @@ func TestUpdateDeployment(t *testing.T) {
 				PodSelectorLabels: podTemplateSpec.Labels,
 			}
 
-			deploymentSpec := generator.GetDeploymentSpec(deployParams)
+			deploymentSpec := generator.New().GetDeploymentSpec(deployParams)
 			updatedDeployment, err := fkclient.UpdateDeployment(*deploymentSpec)
 
 			// Checks for unexpected error cases

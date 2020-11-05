@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/odo/pkg/devfile/adapters/kubernetes"
 	devfileParser "github.com/openshift/odo/pkg/devfile/parser"
 	"github.com/openshift/odo/pkg/kclient"
+	"github.com/openshift/odo/pkg/kclient/generator"
 	"github.com/openshift/odo/pkg/lclient"
 	"github.com/openshift/odo/pkg/odo/util/pushtarget"
 )
@@ -26,6 +27,8 @@ func NewComponentAdapter(componentName string, context string, appName string, d
 	if pushtarget.IsPushTargetDocker() {
 		return createDockerAdapter(adapterContext)
 	}
+
+	adapterContext.Generator = generator.New()
 
 	kc, ok := platformContext.(kubernetes.KubernetesContext)
 	if !ok {

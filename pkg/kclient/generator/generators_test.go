@@ -119,7 +119,7 @@ func TestGetContainers(t *testing.T) {
 				},
 			}
 
-			containers, err := GetContainers(devObj)
+			containers, err := New().GetContainers(devObj)
 			// Unexpected error
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestGetContainers() error = %v, wantErr %v", err, tt.wantErr)
@@ -317,14 +317,14 @@ func TestGetPodTemplateSpec(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.podName, func(t *testing.T) {
 
-			objectMeta := GetObjectMeta(tt.podName, tt.namespace, tt.labels, nil)
+			objectMeta := New().GetObjectMeta(tt.podName, tt.namespace, tt.labels, nil)
 			podTemplateSpecParams := PodTemplateSpecParams{
 				ObjectMeta:     objectMeta,
 				Containers:     container,
 				Volumes:        volume,
 				InitContainers: container,
 			}
-			podTemplateSpec := GetPodTemplateSpec(podTemplateSpecParams)
+			podTemplateSpec := New().GetPodTemplateSpec(podTemplateSpecParams)
 
 			if podTemplateSpec.Name != tt.podName {
 				t.Errorf("expected %s, actual %s", tt.podName, podTemplateSpec.Name)
@@ -625,7 +625,7 @@ func TestGetService(t *testing.T) {
 				},
 			}
 
-			serviceSpec, err := GetService(devObj, tt.labels)
+			serviceSpec, err := New().GetService(devObj, tt.labels)
 
 			// Unexpected error
 			if (err != nil) != tt.wantErr {
@@ -677,7 +677,7 @@ func TestGetBuildConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			commonObjectMeta := GetObjectMeta(tt.ImageName, tt.ImageNamespace, nil, nil)
+			commonObjectMeta := New().GetObjectMeta(tt.ImageName, tt.ImageNamespace, nil, nil)
 			buildStrategy := GetSourceBuildStrategy(tt.ImageName, tt.ImageNamespace)
 			params := BuildConfigParams{
 				CommonObjectMeta: commonObjectMeta,

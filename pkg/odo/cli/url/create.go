@@ -153,7 +153,7 @@ func (o *URLCreateOptions) Complete(_ string, cmd *cobra.Command, args []string)
 		componentName := o.EnvSpecificInfo.GetName()
 
 		var portList []string
-		containers, err := generator.GetContainers(devObj)
+		containers, err := generator.New().GetContainers(devObj)
 		if err != nil {
 			return err
 		}

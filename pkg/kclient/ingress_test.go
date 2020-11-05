@@ -37,7 +37,7 @@ func TestCreateIngress(t *testing.T) {
 			fkclient, fkclientset := FakeNew()
 			fkclient.Namespace = "default"
 
-			objectMeta := generator.GetObjectMeta(tt.ingressName, "default", nil, nil)
+			objectMeta := generator.New().GetObjectMeta(tt.ingressName, "default", nil, nil)
 
 			IngressSpec := generator.GetIngressSpec(generator.IngressParams{ServiceName: tt.ingressName})
 			createdIngress, err := fkclient.CreateIngress(objectMeta, *IngressSpec)

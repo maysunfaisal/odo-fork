@@ -32,7 +32,7 @@ const (
 )
 
 // GetObjectMeta creates a common object meta
-func GetObjectMeta(name, namespace string, labels, annotations map[string]string) metav1.ObjectMeta {
+func (g *GeneratorData) GetObjectMeta(name, namespace string, labels, annotations map[string]string) metav1.ObjectMeta {
 
 	objectMeta := metav1.ObjectMeta{
 		Name:        name,
@@ -79,7 +79,7 @@ func getContainer(containerParams ContainerParams) *corev1.Container {
 }
 
 // GetContainers iterates through the components in the devfile and returns a slice of the corresponding containers
-func GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, error) {
+func (g *GeneratorData) GetContainers(devfileObj devfileParser.DevfileObj) ([]corev1.Container, error) {
 	var containers []corev1.Container
 	for _, comp := range GetDevfileContainerComponents(devfileObj.Data) {
 		envVars := convertEnvs(comp.Container.Env)
@@ -121,7 +121,7 @@ type PodTemplateSpecParams struct {
 }
 
 // GetPodTemplateSpec creates a pod template spec that can be used to create a deployment spec
-func GetPodTemplateSpec(podTemplateSpecParams PodTemplateSpecParams) *corev1.PodTemplateSpec {
+func (g *GeneratorData) GetPodTemplateSpec(podTemplateSpecParams PodTemplateSpecParams) *corev1.PodTemplateSpec {
 	podTemplateSpec := &corev1.PodTemplateSpec{
 		ObjectMeta: podTemplateSpecParams.ObjectMeta,
 		Spec: corev1.PodSpec{
@@ -141,7 +141,7 @@ type DeploymentSpecParams struct {
 }
 
 // GetDeploymentSpec creates a deployment spec
-func GetDeploymentSpec(deployParams DeploymentSpecParams) *appsv1.DeploymentSpec {
+func (g *GeneratorData) GetDeploymentSpec(deployParams DeploymentSpecParams) *appsv1.DeploymentSpec {
 	deploymentSpec := &appsv1.DeploymentSpec{
 		Strategy: appsv1.DeploymentStrategy{
 			Type: appsv1.RecreateDeploymentStrategyType,
@@ -199,12 +199,12 @@ func getServiceSpec(serviceSpecParams ServiceSpecParams) *corev1.ServiceSpec {
 }
 
 // GetService iterates through the components in the devfile and returns a ServiceSpec
-func GetService(devfileObj devfileParser.DevfileObj, selectorLabels map[string]string) (*corev1.ServiceSpec, error) {
+func (g *GeneratorData) GetService(devfileObj devfileParser.DevfileObj, selectorLabels map[string]string) (*corev1.ServiceSpec, error) {
 
 	var containerPorts []corev1.ContainerPort
 	containerComponents := GetDevfileContainerComponents(devfileObj.Data)
 	portExposureMap := GetPortExposure(containerComponents)
-	containers, err := GetContainers(devfileObj)
+	containers, err := New().GetContainers(devfileObj)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func GetRouteSpec(routeParams RouteParams) *routev1.RouteSpec {
 // GetOwnerReference generates an ownerReference  from the deployment which can then be set as
 // owner for various Kubernetes objects and ensure that when the owner object is deleted from the
 // cluster, all other objects are automatically removed by Kubernetes garbage collector
-func GetOwnerReference(deployment *appsv1.Deployment) metav1.OwnerReference {
+func (g *GeneratorData) GetOwnerReference(deployment *appsv1.Deployment) metav1.OwnerReference {
 
 	ownerReference := metav1.OwnerReference{
 		APIVersion: deploymentAPIVersion,
